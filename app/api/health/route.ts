@@ -18,6 +18,20 @@ export async function GET() {
   if (!anonKey) issues.push("Trūksta NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!serviceKey) issues.push("Trūksta SUPABASE_SERVICE_ROLE_KEY");
   if (!stripeKey) issues.push("Trūksta STRIPE_SECRET_KEY");
+
+  if (url && !urlRef) {
+    issues.push(
+      "NEXT_PUBLIC_SUPABASE_URL neteisingas. Turi būti tik: https://jqvlfatzquclkfrclxuh.supabase.co (be /rest/v1/, be kabučių, be tarpų)"
+    );
+  }
+
+  if (anonKey && !anonRef) {
+    issues.push("NEXT_PUBLIC_SUPABASE_ANON_KEY neteisingas — nukopijuokite anon raktą iš Supabase → Settings → API");
+  }
+
+  if (serviceKey && !serviceRef) {
+    issues.push("SUPABASE_SERVICE_ROLE_KEY neteisingas — nukopijuokite service_role raktą iš Supabase → Settings → API");
+  }
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
     warnings.push(
       "Trūksta STRIPE_WEBHOOK_SECRET — webhook neveiks, bet /api/session vis tiek patvirtins mokėjimą"
