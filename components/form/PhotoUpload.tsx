@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { normalizeImageFile } from "@/lib/image-upload";
 
 export type PhotoItem = {
   file: File;
@@ -23,14 +24,13 @@ export function ScreenshotGuide() {
           <code className="rounded bg-white px-1.5 py-0.5 text-xs">Cmd + Shift + 4</code>
         </li>
         <li>
-          Nuotrauka išsaugoma į <strong className="text-ink">iškarpinę</strong> (clipboard). Tada spustelėkite
-          žemiau esantį lauką ir paspauskite{" "}
+          Nuotrauka išsaugoma į <strong className="text-ink">iškarpinę</strong>. Spustelėkite žalią
+          lauką žemiau (ne mygtuką „Pasirinkti failą“) ir paspauskite{" "}
           <code className="rounded bg-white px-1.5 py-0.5 text-xs">Ctrl + V</code>{" "}
           (<code className="rounded bg-white px-1.5 py-0.5 text-xs">Cmd + V</code> Mac)
         </li>
         <li>
-          Arba vilkite failą į lauką, arba spustelėkite ir pasirinkite iš kompiuterio (pvz. iš
-          Atsisiuntimų, jei išsaugojote)
+          Arba vilkite failą į lauką, arba paspauskite „Pasirinkti failą iš kompiuterio“
         </li>
       </ol>
       <p className="mt-3 text-ink-muted">
@@ -50,12 +50,16 @@ export function PhotoUpload({
   maxFiles?: number;
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const [pasteFocused, setPasteFocused] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pasteZoneRef = useRef<HTMLDivElement>(null);
 
   const addFiles = useCallback(
     (files: FileList | File[] | null) => {
       if (!files || files.length === 0) return;
       const remaining = maxFiles - photos.length;
       const toAdd = Array.from(files)
+        .map((file, index) => normalizeImageFile(file, index))
         .filter((f) => f.type.startsWith("image/"))
         .slice(0, remaining);
 
@@ -72,28 +76,23 @@ export function PhotoUpload({
     [photos, onChange, maxFiles]
   );
 
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      const items = e.clipboardData?.items;
-      if (!items) return;
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
 
-      const imageFiles: File[] = [];
-      for (const item of items) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) imageFiles.push(file);
-        }
-      }
-
-      if (imageFiles.length > 0) {
-        e.preventDefault();
-        addFiles(imageFiles);
+    const imageFiles: File[] = [];
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
       }
     }
 
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-  }, [addFiles]);
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      addFiles(imageFiles);
+    }
+  }
 
   function removePhoto(index: number) {
     URL.revokeObjectURL(photos[index].preview);
@@ -109,9 +108,9 @@ export function PhotoUpload({
       <ScreenshotGuide />
 
       {photos.length < maxFiles && (
-        <label
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition-colors outline-none focus-within:border-sage focus-within:ring-2 focus-within:ring-sage/30 ${
-            dragOver ? "border-sage bg-sage-light/30" : "border-cream-dark hover:border-sage"
+        <div
+          className={`rounded-xl border-2 border-dashed px-6 py-8 transition-colors ${
+            dragOver ? "border-sage bg-sage-light/30" : "border-cream-dark"
           }`}
           onDragOver={(e) => {
             e.preventDefault();
@@ -125,21 +124,53 @@ export function PhotoUpload({
           }}
         >
           <input
+            ref={fileInputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
             multiple
             className="hidden"
-            onChange={(e) => addFiles(e.target.files)}
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = "";
+            }}
           />
-          <p className="font-medium text-ink">Įkelkite ekrano nuotraukas</p>
-          <p className="mt-1 text-center text-sm text-ink-muted">
-            Spustelėkite čia ir paspauskite{" "}
-            <strong className="text-ink">Ctrl + V</strong>, jei nuotrauka jau iškarpinėje
-          </p>
-          <p className="mt-1 text-xs text-ink-light">
-            Arba vilkite failus · JPG, PNG, WEBP — iki {maxFiles} failų
-          </p>
-        </label>
+
+          <div
+            ref={pasteZoneRef}
+            tabIndex={0}
+            role="textbox"
+            aria-label="Įklijuokite ekrano nuotrauką iš iškarpinės"
+            onPaste={handlePaste}
+            onFocus={() => setPasteFocused(true)}
+            onBlur={() => setPasteFocused(false)}
+            onClick={() => pasteZoneRef.current?.focus()}
+            className={`cursor-text rounded-xl border-2 px-6 py-8 text-center transition-colors outline-none ${
+              pasteFocused
+                ? "border-sage bg-sage-light/40 ring-2 ring-sage/30"
+                : "border-sage/40 bg-sage-light/20 hover:border-sage hover:bg-sage-light/30"
+            }`}
+          >
+            <p className="font-medium text-ink">Įklijuokite nuotrauką iš iškarpinės</p>
+            <p className="mt-2 text-sm text-ink-muted">
+              Spustelėkite šį žalią lauką, tada{" "}
+              <strong className="text-ink">Ctrl + V</strong> (Mac:{" "}
+              <strong className="text-ink">Cmd + V</strong>)
+            </p>
+          </div>
+
+          <div className="mt-4 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-lg border border-cream-dark bg-white px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-sage hover:bg-cream cursor-pointer"
+            >
+              Pasirinkti failą iš kompiuterio
+            </button>
+            <p className="text-xs text-ink-light">
+              Arba vilkite failus čia · JPG, PNG, WEBP — iki {maxFiles} failų
+            </p>
+          </div>
+        </div>
       )}
 
       {photos.map((photo, i) => (

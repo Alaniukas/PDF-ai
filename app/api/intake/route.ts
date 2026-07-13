@@ -3,6 +3,7 @@ import { getAppUrl } from "@/lib/app-url";
 import { getStripe } from "@/lib/stripe";
 import { createServiceClient, getSupabaseProjectRef } from "@/lib/supabase";
 import { fullFormSchema } from "@/lib/form-schema";
+import { detectImageMime, imageContentType, mimeToExt } from "@/lib/image-upload";
 import { PACKAGES, PackageId } from "@/lib/packages";
 
 function supabaseConfigError(): string | null {
@@ -74,9 +75,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const files = formData.getAll("photos") as File[];
+    const comments = formData.getAll("photo_comments") as string[];
+    const manifestRaw = formData.get("photo_manifest") as string | null;
+    let manifest: Array<{ name?: string; size?: number; comment?: string }> = [];
+
+    if (manifestRaw) {
+      try {
+        manifest = JSON.parse(manifestRaw);
+      } catch {
+        console.warn("Invalid photo_manifest JSON");
+      }
+    }
+
     const { error: responseError } = await supabase.from("form_responses").insert({
       order_id: order.id,
-      answers: validation.data,
+      answers: {
+        ...validation.data,
+        ...(manifest.length > 0 ? { _photo_manifest: manifest } : {}),
+      },
     });
 
     if (responseError) {
@@ -84,28 +101,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nepavyko išsaugoti atsakymų" }, { status: 500 });
     }
 
-    const files = formData.getAll("photos") as File[];
-    const comments = formData.getAll("photo_comments") as string[];
+    console.log("Intake photos received:", {
+      files: files.length,
+      manifest: manifest.length,
+      orderId: order.id,
+    });
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (!file || file.size === 0) continue;
+      const buffer = file ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
 
-      const ext = file.name.split(".").pop() || "jpg";
+      if (!file || buffer.length === 0) {
+        console.warn("Skipping empty photo upload", {
+          index: i,
+          name: file?.name,
+          reportedSize: file?.size,
+        });
+        continue;
+      }
+
+      const contentType = imageContentType(file, mimeToExt(detectImageMime(buffer)), buffer);
+      const ext = mimeToExt(contentType);
       const path = `${order.id}/${Date.now()}-${i}.${ext}`;
-      const buffer = Buffer.from(await file.arrayBuffer());
 
       const { error: uploadError } = await supabase.storage
         .from("intake-uploads")
-        .upload(path, buffer, { contentType: file.type, upsert: false });
+        .upload(path, buffer, { contentType, upsert: false });
 
-      if (!uploadError) {
-        await supabase.from("uploads").insert({
-          order_id: order.id,
-          file_path: path,
-          comment: comments[i] || "",
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError, {
+          path,
+          contentType,
+          size: buffer.length,
+          fileType: file.type,
         });
+        continue;
       }
+
+      const { error: metaError } = await supabase.from("uploads").insert({
+        order_id: order.id,
+        file_path: path,
+        comment: comments[i] || manifest[i]?.comment || "",
+      });
+
+      if (metaError) {
+        console.error("Upload metadata error:", metaError, { path });
+      }
+    }
+
+    if (manifest.length > 0 && files.length === 0) {
+      console.error("Photo manifest present but no files received in FormData", {
+        orderId: order.id,
+        manifest,
+      });
     }
 
     const stripe = getStripe();

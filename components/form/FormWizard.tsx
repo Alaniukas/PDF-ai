@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   AGE_RANGES,
   AI_EXPERIENCE,
@@ -30,6 +30,7 @@ import { trackInitiateCheckout } from "@/lib/analytics/track";
 import { Package, PackageId } from "@/lib/packages";
 import { GuidedOrFreeField } from "./GuidedOrFreeField";
 import { PhotoItem, PhotoUpload } from "./PhotoUpload";
+import { normalizeImageFile } from "@/lib/image-upload";
 
 type Props = {
   packageId: PackageId;
@@ -199,11 +200,19 @@ export function FormWizard({ packageId, packageInfo }: Props) {
   const [digitizeGuidedAnswers, setDigitizeGuidedAnswers] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const stepContentRef = useRef<HTMLDivElement>(null);
 
   const currentStepId = FORM_STEPS[step].id as StepId;
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const el = stepContentRef.current;
+    if (!el) return;
+
+    requestAnimationFrame(() => {
+      const rect = el.getBoundingClientRect();
+      const targetY = window.scrollY + rect.top - window.innerHeight * 0.35;
+      window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
+    });
   }, [step]);
 
   function updateField(key: keyof typeof emptyForm, value: string | boolean | string[]) {
@@ -297,8 +306,23 @@ export function FormWizard({ packageId, packageInfo }: Props) {
     const body = new FormData();
     body.append("package_id", packageId);
     body.append("answers", JSON.stringify(payload));
-    photos.forEach((p) => {
-      body.append("photos", p.file);
+    body.append(
+      "photo_manifest",
+      JSON.stringify(
+        photos.map((p, i) => {
+          const file = normalizeImageFile(p.file, i);
+          return {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            comment: p.comment,
+          };
+        })
+      )
+    );
+    photos.forEach((p, i) => {
+      const file = normalizeImageFile(p.file, i);
+      body.append("photos", file);
       body.append("photo_comments", p.comment);
     });
 
@@ -357,7 +381,7 @@ export function FormWizard({ packageId, packageInfo }: Props) {
         </p>
       </div>
 
-      <div className="space-y-5">
+      <div ref={stepContentRef} className="space-y-5">
         {currentStepId === "about" && (
           <>
             <div>
