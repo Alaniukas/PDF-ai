@@ -1,0 +1,26 @@
+import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { killAllDevServers } from "./kill-all-dev.mjs";
+
+const PORT = Number(process.env.PORT) || 3456;
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const NEXT_BIN = path.join(ROOT, "node_modules", "next", "dist", "bin", "next");
+
+async function main() {
+  console.log("\n=== DI darbo gidas — dev serveris ===");
+  console.log(`Projektas: ${ROOT}\n`);
+
+  await killAllDevServers();
+
+  console.log(`>>> Atidarykite: http://localhost:${PORT} <<<\n`);
+
+  const child = spawn(process.execPath, [NEXT_BIN, "dev", "-p", String(PORT)], {
+    stdio: "inherit",
+    cwd: ROOT,
+  });
+
+  child.on("exit", (code) => process.exit(code ?? 0));
+}
+
+main();

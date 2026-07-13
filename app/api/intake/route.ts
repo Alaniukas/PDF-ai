@@ -1,0 +1,155 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/app-url";
+import { getStripe } from "@/lib/stripe";
+import { createServiceClient, getSupabaseProjectRef } from "@/lib/supabase";
+import { fullFormSchema } from "@/lib/form-schema";
+import { PACKAGES, PackageId } from "@/lib/packages";
+
+function supabaseConfigError(): string | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const urlRef = getSupabaseProjectRef(url);
+  const keyRef = getSupabaseProjectRef(serviceKey);
+
+  if (!urlRef || !keyRef) return null;
+  if (urlRef !== keyRef) {
+    return `Supabase raktai iš skirtingų projektų (URL: ${urlRef}, service role: ${keyRef}). Dashboard → Settings → API → service_role — įklijuokite į .env.local`;
+  }
+  return null;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const configError = supabaseConfigError();
+    if (configError) {
+      return NextResponse.json({ error: configError }, { status: 500 });
+    }
+
+    const formData = await request.formData();
+    const answersRaw = formData.get("answers") as string;
+    const packageId = formData.get("package_id") as PackageId;
+
+    if (!answersRaw || !packageId) {
+      return NextResponse.json({ error: "Trūksta duomenų" }, { status: 400 });
+    }
+
+    const pkg = PACKAGES[packageId];
+    if (!pkg) {
+      return NextResponse.json({ error: "Neteisingas paketas" }, { status: 400 });
+    }
+
+    const parsed = JSON.parse(answersRaw);
+    const validation = fullFormSchema.safeParse(parsed);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Formos validacijos klaida", details: validation.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createServiceClient();
+    const email = validation.data.email;
+
+    const { data: order, error: orderError } = await supabase
+      .from("orders")
+      .insert({
+        email,
+        package_id: packageId,
+        amount_cents: pkg.priceCents,
+        status: "pending_payment",
+      })
+      .select("id")
+      .single();
+
+    if (orderError || !order) {
+      console.error("Order create error:", orderError);
+      return NextResponse.json(
+        {
+          error:
+            orderError?.message?.includes("JWT")
+              ? "Supabase service role raktas neteisingas. Atnaujinkite SUPABASE_SERVICE_ROLE_KEY .env.local faile."
+              : "Nepavyko sukurti užsakymo",
+        },
+        { status: 500 }
+      );
+    }
+
+    const { error: responseError } = await supabase.from("form_responses").insert({
+      order_id: order.id,
+      answers: validation.data,
+    });
+
+    if (responseError) {
+      console.error("Form response error:", responseError);
+      return NextResponse.json({ error: "Nepavyko išsaugoti atsakymų" }, { status: 500 });
+    }
+
+    const files = formData.getAll("photos") as File[];
+    const comments = formData.getAll("photo_comments") as string[];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file || file.size === 0) continue;
+
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${order.id}/${Date.now()}-${i}.${ext}`;
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      const { error: uploadError } = await supabase.storage
+        .from("intake-uploads")
+        .upload(path, buffer, { contentType: file.type, upsert: false });
+
+      if (!uploadError) {
+        await supabase.from("uploads").insert({
+          order_id: order.id,
+          file_path: path,
+          comment: comments[i] || "",
+        });
+      }
+    }
+
+    const stripe = getStripe();
+    const appUrl = getAppUrl();
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      customer_email: email,
+      line_items: [
+        {
+          price_data: {
+            currency: "eur",
+            product_data: {
+              name: `${pkg.name}: ${pkg.subtitle}`,
+              description: pkg.description,
+            },
+            unit_amount: pkg.priceCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        package_id: pkg.id,
+        order_id: order.id,
+      },
+      success_url: `${appUrl}/aciu?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/anketa?package=${packageId}&cancelled=true`,
+      billing_address_collection: "auto",
+    });
+
+    await supabase
+      .from("orders")
+      .update({ stripe_session_id: session.id })
+      .eq("id", order.id);
+
+    if (!session.url) {
+      return NextResponse.json({ error: "Nepavyko sukurti mokėjimo" }, { status: 500 });
+    }
+
+    return NextResponse.json({ url: session.url, package_id: pkg.id, amount: pkg.priceEur });
+  } catch (error) {
+    console.error("Intake error:", error);
+    const message = error instanceof Error ? error.message : "Serverio klaida";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

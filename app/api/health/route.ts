@@ -1,0 +1,51 @@
+import { NextResponse } from "next/server";
+import { getSupabaseProjectRef } from "@/lib/supabase";
+
+export async function GET() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+
+  const urlRef = getSupabaseProjectRef(url);
+  const anonRef = getSupabaseProjectRef(anonKey);
+  const serviceRef = getSupabaseProjectRef(serviceKey);
+
+  const issues: string[] = [];
+  const warnings: string[] = [];
+
+  if (!url) issues.push("Trūksta NEXT_PUBLIC_SUPABASE_URL");
+  if (!anonKey) issues.push("Trūksta NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  if (!serviceKey) issues.push("Trūksta SUPABASE_SERVICE_ROLE_KEY");
+  if (!stripeKey) issues.push("Trūksta STRIPE_SECRET_KEY");
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    warnings.push(
+      "Trūksta STRIPE_WEBHOOK_SECRET — webhook neveiks, bet /api/session vis tiek patvirtins mokėjimą"
+    );
+  }
+
+  if (urlRef && anonRef && urlRef !== anonRef) {
+    issues.push(`Anon raktas iš kito projekto (${anonRef}), URL projektas: ${urlRef}`);
+  }
+
+  if (urlRef && serviceRef && urlRef !== serviceRef) {
+    issues.push(
+      `SERVICE ROLE raktas iš KITO projekto (${serviceRef}). Reikia rakto iš projekto ${urlRef} (org PDF → alaniukas). Atidarykite: https://supabase.com/dashboard/project/${urlRef}/settings/api → service_role → Copy → įklijuokite į .env.local`
+    );
+  }
+
+  const ok = issues.length === 0;
+
+  return NextResponse.json({
+    ok,
+    project: urlRef,
+    checks: {
+      supabase_url: !!url,
+      supabase_anon: anonRef === urlRef,
+      supabase_service_role: serviceRef === urlRef,
+      stripe: !!stripeKey,
+    },
+    issues,
+    warnings,
+  });
+}
