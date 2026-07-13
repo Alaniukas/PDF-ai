@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
+import { getAppUrl } from "@/lib/app-url";
 import { isMetaCapiConfigured } from "@/lib/meta-capi";
 import { getSupabaseProjectRef, normalizeSupabaseUrl } from "@/lib/supabase";
+
+function validateAppUrl(): string | null {
+  try {
+    getAppUrl();
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "NEXT_PUBLIC_APP_URL neteisingas";
+  }
+}
 
 export async function GET() {
   const urlRaw = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -20,6 +30,9 @@ export async function GET() {
   if (!anonKey) issues.push("Trūksta NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!serviceKey) issues.push("Trūksta SUPABASE_SERVICE_ROLE_KEY");
   if (!stripeKey) issues.push("Trūksta STRIPE_SECRET_KEY");
+
+  const appUrlIssue = validateAppUrl();
+  if (appUrlIssue) issues.push(appUrlIssue);
 
   if (urlRaw && /\/rest\/v1\/?$/i.test(urlRaw.trim())) {
     issues.push(
@@ -75,9 +88,11 @@ export async function GET() {
       supabase_anon: anonRef === urlRef,
       supabase_service_role: serviceRef === urlRef,
       stripe: !!stripeKey,
+      app_url: !appUrlIssue,
       meta_pixel: !!pixelId,
       meta_capi: isMetaCapiConfigured(),
     },
+    app_url: appUrlIssue ? null : getAppUrl(),
     issues,
     warnings,
   });
