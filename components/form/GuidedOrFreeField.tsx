@@ -51,6 +51,7 @@ export function GuidedOrFreeField({
   freeRows = 5,
   hint,
   error,
+  sectionTitleForQuestion,
 }: {
   label: string;
   required?: boolean;
@@ -65,6 +66,7 @@ export function GuidedOrFreeField({
   freeRows?: number;
   hint?: string;
   error?: string;
+  sectionTitleForQuestion?: (question: GuidedQuestion) => string | null;
 }) {
   return (
     <div>
@@ -81,26 +83,34 @@ export function GuidedOrFreeField({
           onChange={(e) => onFreeChange(e.target.value)}
           placeholder={freePlaceholder}
           rows={freeRows}
-          className="mt-3 w-full rounded-lg border border-cream-dark bg-white px-4 py-2.5 text-ink placeholder:text-ink-light focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
+          className="form-field mt-3 bg-white"
         />
       ) : (
-        <div className="mt-3 space-y-4 rounded-xl border border-sage/20 bg-sage-light/15 p-4">
+        <div className="mt-3 space-y-4 rounded-xl border border-sage/20 bg-sage-light/15 p-3 sm:p-4">
           <p className="text-xs text-sage-dark">
             Atsakykite į klausimus pagal Jūsų pareigas — kuo detaliau, tuo tikslesnis bus Jūsų
             PDF gidas.
           </p>
-          {guidedQuestions.map((q) => (
-            <div key={q.id}>
-              <label className="block text-sm font-medium text-ink">{q.label}</label>
-              <textarea
-                value={guidedAnswers[q.id] || ""}
-                onChange={(e) => onGuidedChange(q.id, e.target.value)}
-                placeholder={q.placeholder}
-                rows={2}
-                className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-light focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
-              />
-            </div>
-          ))}
+          {guidedQuestions.map((q) => {
+            const sectionTitle = sectionTitleForQuestion?.(q);
+            return (
+              <div key={q.id}>
+                {sectionTitle && (
+                  <p className="mb-3 border-b border-sage/20 pb-2 font-serif text-base text-sage-dark">
+                    {sectionTitle}
+                  </p>
+                )}
+                <label className="block text-sm font-medium text-ink">{q.label}</label>
+                <textarea
+                  value={guidedAnswers[q.id] || ""}
+                  onChange={(e) => onGuidedChange(q.id, e.target.value)}
+                  placeholder={q.placeholder}
+                  rows={3}
+                  className="form-field mt-1.5 bg-white text-sm"
+                />
+              </div>
+            );
+          })}
         </div>
       )}
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}

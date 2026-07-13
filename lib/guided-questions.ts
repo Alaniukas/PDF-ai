@@ -38,13 +38,34 @@ const DEFAULT_WORK: GuidedQuestion[] = [
   { id: "w4", label: "Kas Jums labiausiai erzina ar atima laiko?", placeholder: "Pvz.: rankinis kopijavimas, ilgas formatavimas…" },
 ];
 
-const DEFAULT_DIGITIZE: GuidedQuestion[] = [
-  { id: "d1", label: "Kurią užduotį norėtumėte skaitmenizuoti ar pritaikyti DI?", placeholder: "Pvz.: susitikimų santraukos, Excel ataskaitos…" },
-  { id: "d2", label: "Kaip ją darote dabar? (trumpai, žingsniais)", placeholder: "Pvz.: 1) atidarau failą, 2) filtruoju, 3) kopijuoju…" },
-  { id: "d3", label: "Kiek laiko tai užima per savaitę?", placeholder: "Pvz.: ~3 val. per savaitę" },
-  { id: "d4", label: "Kas labiausiai erzina šiame procese?", placeholder: "Pvz.: rankinis suvedimas, klaidos, lėtas formatavimas…" },
-  { id: "d5", label: "Kaip turėtų atrodyti idealus rezultatas?", placeholder: "Pvz.: sutaupyčiau 2 val., viskas automatiškai…" },
-];
+function digitizeTaskQuestions(taskNum: number, totalTasks: number): GuidedQuestion[] {
+  const multi = totalTasks > 1;
+
+  return [
+    {
+      id: `t${taskNum}_what`,
+      label: multi
+        ? "Ką norėtumėte optimizuoti?"
+        : "Kurią užduotį norėtumėte skaitmenizuoti ar pritaikyti DI?",
+      placeholder: "Pvz.: susitikimų santraukos, Excel ataskaitos, laiškų atsakymai…",
+    },
+    {
+      id: `t${taskNum}_how`,
+      label: "Kaip ją darote dabar? (žingsniais)",
+      placeholder: "Pvz.: 1) atidarau failą, 2) filtruoju duomenis, 3) kopijuoju į ataskaitą…",
+    },
+    {
+      id: `t${taskNum}_pain`,
+      label: "Kas labiausiai erzina šiame procese?",
+      placeholder: "Pvz.: rankinis suvedimas, klaidos, lėtas formatavimas…",
+    },
+    {
+      id: `t${taskNum}_goal`,
+      label: "Kaip turėtų atrodyti idealus rezultatas?",
+      placeholder: "Pvz.: sutaupyčiau 2 val., viskas automatiškai, mažiau klaidų…",
+    },
+  ];
+}
 
 function matchKeyword(jobTitle: string): GuidedQuestion[] | null {
   const lower = jobTitle.toLowerCase();
@@ -58,19 +79,67 @@ export function getWorkGuidedQuestions(jobTitle: string): GuidedQuestion[] {
   return matchKeyword(jobTitle) ?? DEFAULT_WORK;
 }
 
-export function getDigitizeGuidedQuestions(jobTitle: string, maxTasks: number): GuidedQuestion[] {
-  const base = DEFAULT_DIGITIZE;
-  if (maxTasks <= 1) return base;
-
-  const extra: GuidedQuestion[] = [];
-  for (let i = 2; i <= maxTasks; i++) {
-    extra.push({
-      id: `d_extra_${i}`,
-      label: `${i}-oji užduotis, kurią norėtumėte optimizuoti`,
-      placeholder: "Trumpai aprašykite užduotį…",
-    });
+export function getDigitizeGuidedQuestions(_jobTitle: string, maxTasks: number): GuidedQuestion[] {
+  const questions: GuidedQuestion[] = [];
+  for (let i = 1; i <= maxTasks; i++) {
+    questions.push(...digitizeTaskQuestions(i, maxTasks));
   }
-  return [...base, ...extra];
+  return questions;
+}
+
+export function buildDigitizeFieldsFromGuided(
+  maxTasks: number,
+  answers: Record<string, string>
+): {
+  digitize_what: string;
+  current_process: string;
+  pain_processes: string;
+  desired_outcome: string;
+  repeat_tasks: string;
+} {
+  const whats: string[] = [];
+  const hows: string[] = [];
+  const pains: string[] = [];
+  const goals: string[] = [];
+
+  for (let i = 1; i <= maxTasks; i++) {
+    const what = answers[`t${i}_what`]?.trim();
+    const how = answers[`t${i}_how`]?.trim();
+    const pain = answers[`t${i}_pain`]?.trim();
+    const goal = answers[`t${i}_goal`]?.trim();
+
+    if (what) {
+      whats.push(maxTasks > 1 ? `${i} užduotis: ${what}` : what);
+    }
+    if (how) {
+      hows.push(maxTasks > 1 ? `${i} užduotis:\n${how}` : how);
+    }
+    if (pain) {
+      pains.push(maxTasks > 1 ? `${i} užduotis: ${pain}` : pain);
+    }
+    if (goal) {
+      goals.push(maxTasks > 1 ? `${i} užduotis: ${goal}` : goal);
+    }
+  }
+
+  const digitize_what = whats.join("\n\n");
+  const current_process = hows.join("\n\n");
+  const pain_processes = pains.join("\n\n");
+  const desired_outcome = goals.join("\n\n");
+
+  return {
+    digitize_what,
+    current_process,
+    pain_processes,
+    desired_outcome,
+    repeat_tasks: digitize_what,
+  };
+}
+
+export function digitizeTaskSectionTitle(questionId: string, maxTasks: number): string | null {
+  const match = questionId.match(/^t(\d+)_what$/);
+  if (!match || maxTasks <= 1) return null;
+  return `${match[1]} užduotis`;
 }
 
 export function combineGuidedAnswers(

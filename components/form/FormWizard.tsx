@@ -7,6 +7,9 @@ import {
   AI_FEARS,
   AI_PRESSURE,
   AI_TOOLS,
+  COMPANY_AI_LICENSE,
+  COMPANY_AI_LICENSE_TOOLS,
+  COMPANY_AI_LICENSE_YES,
   DELIVERY_OPTIONS,
   DEVICE_TYPE,
   EMPLOYER_TYPES,
@@ -21,11 +24,17 @@ import {
   stepSchemas,
 } from "@/lib/form-schema";
 import {
+  buildDigitizeFieldsFromGuided,
   combineGuidedAnswers,
+  digitizeTaskSectionTitle,
   getDigitizeGuidedQuestions,
   getWorkGuidedQuestions,
 } from "@/lib/guided-questions";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
+import {
+  createMetaEventId,
+  getMetaBrowserIds,
+} from "@/lib/analytics/meta-client";
 import { trackInitiateCheckout } from "@/lib/analytics/track";
 import { Package, PackageId } from "@/lib/packages";
 import { GuidedOrFreeField } from "./GuidedOrFreeField";
@@ -64,6 +73,9 @@ const emptyForm = {
   desired_outcome: "",
   tools_used: [] as string[],
   tools_other: "",
+  company_ai_license: "Nežinau" as (typeof COMPANY_AI_LICENSE)[number],
+  company_ai_license_tools: [] as string[],
+  company_ai_license_details: "",
   ai_tools_tried: [] as string[],
   ai_experience: "Visiškai nauja" as const,
   ai_fears: [] as string[],
@@ -102,7 +114,7 @@ function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-4 py-2.5 text-ink placeholder:text-ink-light focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
+      className="form-field"
     />
   );
 }
@@ -124,7 +136,7 @@ function TextArea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-4 py-2.5 text-ink placeholder:text-ink-light focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
+      className="form-field"
     />
   );
 }
@@ -142,7 +154,7 @@ function SelectInput({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="mt-1.5 w-full rounded-lg border border-cream-dark bg-white px-4 py-2.5 text-ink focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
+      className="form-field"
     >
       {options.map((opt) => (
         <option key={opt} value={opt}>
@@ -171,19 +183,19 @@ function CheckboxGroup({
   }
 
   return (
-    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
       {options.map((opt) => (
         <label
           key={opt}
-          className="flex cursor-pointer items-center gap-2 rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm hover:border-sage"
+          className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-cream-dark bg-white px-3 py-2.5 text-sm hover:border-sage"
         >
           <input
             type="checkbox"
             checked={values.includes(opt)}
             onChange={() => toggle(opt)}
-            className="h-4 w-4 rounded border-cream-dark text-sage focus:ring-sage"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-cream-dark text-sage focus:ring-sage"
           />
-          {opt}
+          <span className="min-w-0 flex-1 break-words leading-snug">{opt}</span>
         </label>
       ))}
     </div>
@@ -241,19 +253,12 @@ export function FormWizard({ packageId, packageInfo }: Props) {
     }
 
     if (data.digitize_mode === "guided") {
-      data.digitize_what =
-        [
-          digitizeGuidedAnswers.d1,
-          ...digitizeQuestions
-            .filter((q) => q.id.startsWith("d_extra_"))
-            .map((q) => digitizeGuidedAnswers[q.id]),
-        ]
-          .filter(Boolean)
-          .join("\n") || data.digitize_what;
-      data.current_process = digitizeGuidedAnswers.d2?.trim() || data.current_process;
-      data.pain_processes = digitizeGuidedAnswers.d4?.trim() || data.pain_processes;
-      data.desired_outcome = digitizeGuidedAnswers.d5?.trim() || data.desired_outcome;
-      data.repeat_tasks = digitizeGuidedAnswers.d1?.trim() || data.repeat_tasks;
+      const built = buildDigitizeFieldsFromGuided(maxTasks, digitizeGuidedAnswers);
+      data.digitize_what = built.digitize_what || data.digitize_what;
+      data.current_process = built.current_process || data.current_process;
+      data.pain_processes = built.pain_processes || data.pain_processes;
+      data.desired_outcome = built.desired_outcome || data.desired_outcome;
+      data.repeat_tasks = built.repeat_tasks || data.repeat_tasks;
     } else if (data.digitize_what.trim()) {
       const free = data.digitize_what.trim();
       data.current_process = data.current_process.trim() || free;
@@ -306,6 +311,20 @@ export function FormWizard({ packageId, packageInfo }: Props) {
     const body = new FormData();
     body.append("package_id", packageId);
     body.append("answers", JSON.stringify(payload));
+
+    let checkoutEventId: string | undefined;
+    if (hasAnalyticsConsent()) {
+      const browserIds = getMetaBrowserIds();
+      checkoutEventId = createMetaEventId("checkout");
+      body.append(
+        "meta_tracking",
+        JSON.stringify({
+          initiate_checkout_event_id: checkoutEventId,
+          ...browserIds,
+        })
+      );
+    }
+
     body.append(
       "photo_manifest",
       JSON.stringify(
@@ -331,8 +350,8 @@ export function FormWizard({ packageId, packageInfo }: Props) {
 
     const data = await res.json();
     if (res.ok && data.url) {
-      if (hasAnalyticsConsent()) {
-        trackInitiateCheckout(packageInfo.priceEur, packageId);
+      if (hasAnalyticsConsent() && checkoutEventId) {
+        trackInitiateCheckout(packageInfo.priceEur, packageId, checkoutEventId);
       }
       window.location.href = data.url;
     } else {
@@ -350,9 +369,9 @@ export function FormWizard({ packageId, packageInfo }: Props) {
   }
 
   return (
-    <div>
-      <div className="mb-8 rounded-xl border border-sage/30 bg-sage-light/40 px-4 py-3 text-sm">
-        <p className="font-medium text-sage-dark">
+    <div className="min-w-0">
+      <div className="mb-6 rounded-xl border border-sage/30 bg-sage-light/40 px-3 py-3 text-sm sm:mb-8 sm:px-4">
+        <p className="break-words font-medium text-sage-dark">
           Paketas: {packageInfo.name} — {packageInfo.subtitle} ({packageInfo.priceEur} €)
         </p>
         <p className="mt-1 text-ink-muted">
@@ -381,7 +400,7 @@ export function FormWizard({ packageId, packageInfo }: Props) {
         </p>
       </div>
 
-      <div ref={stepContentRef} className="space-y-5">
+      <div ref={stepContentRef} className="min-w-0 space-y-5">
         {currentStepId === "about" && (
           <>
             <div>
@@ -531,7 +550,11 @@ export function FormWizard({ packageId, packageInfo }: Props) {
                   : `Kurias užduotis (iki ${maxTasks}) norėtumėte skaitmenizuoti ar pritaikyti DI?`
               }
               required
-              hint="Kuo detaliau — tuo geriau. Galite aprašyti patys arba atsakyti į klausimus."
+              hint={
+                maxTasks === 1
+                  ? "Kuo detaliau — tuo geriau. Galite aprašyti patys arba atsakyti į klausimus."
+                  : `Aprašykite kiekvieną užduotį atskirai (iki ${maxTasks}). Kiekvienai — ką darote, kaip darote, kas erzina ir ko norite.`
+              }
               mode={form.digitize_mode || "guided"}
               onModeChange={(m) => updateField("digitize_mode", m)}
               freeValue={form.digitize_what}
@@ -541,26 +564,30 @@ export function FormWizard({ packageId, packageInfo }: Props) {
               onGuidedChange={(id, v) =>
                 setDigitizeGuidedAnswers((prev) => ({ ...prev, [id]: v }))
               }
+              sectionTitleForQuestion={(q) => digitizeTaskSectionTitle(q.id, maxTasks)}
               freePlaceholder="Aprašykite užduotį, kaip ją darote dabar, kas erzina ir ko norite pasiekti…"
               freeRows={7}
               error={
                 errors.digitize_what ||
                 errors.current_process ||
                 errors.pain_processes ||
-                errors.desired_outcome
+                errors.desired_outcome ||
+                errors.repeat_tasks
               }
             />
-            <div>
-              <FieldLabel required>Ką darote pakartotinai kiekvieną savaitę?</FieldLabel>
-              <TextArea
-                value={form.repeat_tasks}
-                onChange={(v) => updateField("repeat_tasks", v)}
-                placeholder="Pvz.: kiekvieną pirmadienį ruošiu ataskaitą, kiekvieną penktadienį suvedu duomenis…"
-              />
-              {errors.repeat_tasks && (
-                <p className="mt-1 text-sm text-red-600">{errors.repeat_tasks}</p>
-              )}
-            </div>
+            {form.digitize_mode !== "guided" && (
+              <div>
+                <FieldLabel required>Ką darote pakartotinai kiekvieną savaitę?</FieldLabel>
+                <TextArea
+                  value={form.repeat_tasks}
+                  onChange={(v) => updateField("repeat_tasks", v)}
+                  placeholder="Pvz.: kiekvieną pirmadienį ruošiu ataskaitą, kiekvieną penktadienį suvedu duomenis…"
+                />
+                {errors.repeat_tasks && (
+                  <p className="mt-1 text-sm text-red-600">{errors.repeat_tasks}</p>
+                )}
+              </div>
+            )}
             <div>
               <FieldLabel required>Kiek laiko per savaitę tai užima?</FieldLabel>
               <SelectInput
@@ -593,6 +620,41 @@ export function FormWizard({ packageId, packageInfo }: Props) {
                 placeholder="Pvz.: Canva, Notion, SharePoint…"
               />
             </div>
+            <div>
+              <FieldLabel required>Ar Jūsų įmonė turi nusipirkusią DI licenciją darbuotojams?</FieldLabel>
+              <SelectInput
+                value={form.company_ai_license}
+                onChange={(v) => updateField("company_ai_license", v)}
+                options={COMPANY_AI_LICENSE}
+              />
+              {errors.company_ai_license && (
+                <p className="mt-1 text-sm text-red-600">{errors.company_ai_license}</p>
+              )}
+              <p className="mt-1 text-xs text-ink-muted">
+                Pvz. Microsoft 365 Copilot, ChatGPT Team/Enterprise — oficialus įmonės įrankis, ne asmeninis
+                ChatGPT.
+              </p>
+            </div>
+            {form.company_ai_license === COMPANY_AI_LICENSE_YES && (
+              <>
+                <div>
+                  <FieldLabel>Kurį DI įrankį įmonė suteikia? (pasirinkite visus, kurie taikomi)</FieldLabel>
+                  <CheckboxGroup
+                    values={form.company_ai_license_tools}
+                    options={COMPANY_AI_LICENSE_TOOLS}
+                    onChange={(v) => updateField("company_ai_license_tools", v)}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Papildomai — kokia licencija ar kaip naudojate?</FieldLabel>
+                  <TextInput
+                    value={form.company_ai_license_details || ""}
+                    onChange={(v) => updateField("company_ai_license_details", v)}
+                    placeholder="Pvz.: Copilot tik Outlook ir Word, ChatGPT Enterprise visiems…"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <FieldLabel required>Ar bandėte naudoti DI įrankius? (pasirinkite visus, kurie taikomi)</FieldLabel>
               <CheckboxGroup
@@ -709,14 +771,14 @@ export function FormWizard({ packageId, packageInfo }: Props) {
                 </div>
               </>
             )}
-            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-cream-dark bg-white p-4">
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-cream-dark bg-white p-3 sm:p-4">
               <input
                 type="checkbox"
                 checked={form.consent === true}
                 onChange={(e) => updateField("consent", e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-cream-dark text-sage focus:ring-sage"
+                className="mt-1 h-4 w-4 shrink-0 rounded border-cream-dark text-sage focus:ring-sage"
               />
-              <span className="text-sm text-ink-muted">
+              <span className="min-w-0 flex-1 text-sm leading-relaxed text-ink-muted">
                 Sutinku, kad mano duomenys būtų naudojami PDF rengimui. Duomenys saugomi ir
                 nenaudojami kitiems tikslams.
               </span>
@@ -726,23 +788,23 @@ export function FormWizard({ packageId, packageInfo }: Props) {
         )}
       </div>
 
-      <div className="mt-10 flex justify-between gap-4">
+      <div className="mt-8 flex flex-col-reverse gap-3 sm:mt-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         {step > 0 ? (
           <button
             type="button"
             onClick={back}
-            className="rounded-full border border-cream-dark px-6 py-3 text-sm font-medium text-ink-muted hover:text-ink cursor-pointer"
+            className="w-full rounded-full border border-cream-dark px-6 py-3 text-sm font-medium text-ink-muted hover:text-ink sm:w-auto cursor-pointer"
           >
             Atgal
           </button>
         ) : (
-          <div />
+          <div className="hidden sm:block" />
         )}
         {step < FORM_STEPS.length - 1 ? (
           <button
             type="button"
             onClick={next}
-            className="rounded-full bg-sage px-8 py-3 text-sm font-medium text-white hover:bg-sage-dark cursor-pointer"
+            className="w-full rounded-full bg-sage px-8 py-3 text-sm font-medium text-white hover:bg-sage-dark sm:ml-auto sm:w-auto cursor-pointer"
           >
             Toliau
           </button>
@@ -751,7 +813,7 @@ export function FormWizard({ packageId, packageInfo }: Props) {
             type="button"
             onClick={submit}
             disabled={submitting}
-            className="rounded-full bg-sage px-8 py-3 text-sm font-medium text-white hover:bg-sage-dark disabled:opacity-50 cursor-pointer"
+            className="w-full rounded-full bg-sage px-6 py-3.5 text-sm font-medium leading-snug text-white hover:bg-sage-dark disabled:opacity-50 sm:ml-auto sm:w-auto sm:px-8 cursor-pointer"
           >
             {submitting ? "Ruošiama apmokėjimui…" : `Tęsti į apmokėjimą — ${packageInfo.priceEur} €`}
           </button>

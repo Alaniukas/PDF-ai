@@ -24,7 +24,7 @@ export function PricingSection() {
             return (
               <div
                 key={pkg.id}
-                className={`relative flex flex-col rounded-2xl border p-6 md:p-8 ${
+                className={`relative flex flex-col rounded-2xl border p-5 sm:p-6 md:p-8 ${
                   isPopular
                     ? "border-sage bg-white shadow-lg ring-1 ring-sage/20 lg:scale-[1.02]"
                     : "border-cream-dark bg-white"

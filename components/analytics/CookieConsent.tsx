@@ -27,6 +27,7 @@ export function CookieConsent() {
       role="dialog"
       aria-label="Slapukų sutikimas"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-cream-dark bg-white/98 p-4 shadow-lg backdrop-blur-sm sm:p-6"
+      style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
     >
       <div className="layout-shell flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="max-w-3xl text-sm leading-relaxed text-ink-muted">

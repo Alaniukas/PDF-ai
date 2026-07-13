@@ -1,7 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { CookieConsent } from "@/components/analytics/CookieConsent";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "DI darbo gidas | Asmeninis PDF Jūsų darbui",
@@ -35,8 +41,8 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="antialiased">
-        {children}
+      <body className="antialiased overflow-x-clip">
+        <div className="min-w-0">{children}</div>
         <AnalyticsProvider />
         <CookieConsent />
       </body>

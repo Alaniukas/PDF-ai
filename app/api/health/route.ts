@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isMetaCapiConfigured } from "@/lib/meta-capi";
 import { getSupabaseProjectRef, normalizeSupabaseUrl } from "@/lib/supabase";
 
 export async function GET() {
@@ -45,6 +46,15 @@ export async function GET() {
     );
   }
 
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID;
+  if (!pixelId) {
+    warnings.push("Trūksta NEXT_PUBLIC_META_PIXEL_ID — Meta Pixel neveiks");
+  } else if (!isMetaCapiConfigured()) {
+    warnings.push(
+      "Trūksta META_CAPI_ACCESS_TOKEN — veiks tik naršyklės Pixel, be server-side Conversions API"
+    );
+  }
+
   if (urlRef && anonRef && urlRef !== anonRef) {
     issues.push(`Anon raktas iš kito projekto (${anonRef}), URL projektas: ${urlRef}`);
   }
@@ -65,6 +75,8 @@ export async function GET() {
       supabase_anon: anonRef === urlRef,
       supabase_service_role: serviceRef === urlRef,
       stripe: !!stripeKey,
+      meta_pixel: !!pixelId,
+      meta_capi: isMetaCapiConfigured(),
     },
     issues,
     warnings,

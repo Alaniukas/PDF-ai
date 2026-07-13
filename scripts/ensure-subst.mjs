@@ -1,27 +1,37 @@
 import { execSync } from "node:child_process";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DRIVE = "X:";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REAL_ROOT = path.resolve(__dirname, "..");
 
-function getSubstTarget(letter) {
-  try {
-    const out = execSync("subst", { encoding: "utf8" });
-    const prefix = `${letter}\\`.toUpperCase();
-    for (const line of out.split(/\r?\n/)) {
-      if (!line.toUpperCase().startsWith(prefix)) continue;
-      const match = line.match(/=>\s*(.+?)(?:\s*\(|$)/);
-      return match?.[1]?.trim() ?? null;
-    }
-  } catch {
-    /* ignore */
-  }
-  return null;
+function junctionPathFor(realPath) {
+  const parent = path.dirname(realPath);
+  const base = path.basename(realPath).replace(/'/g, "-");
+  return path.join(parent, base);
 }
 
-/** Map project to X: on Windows when path contains apostrophe (pdf'ai). */
+function isJunction(filePath) {
+  try {
+    return lstatSync(filePath).isJunction?.() ?? false;
+  } catch {
+    return false;
+  }
+}
+
+function junctionPointsTo(junctionPath, targetPath) {
+  try {
+    return path.resolve(realpathSync(junctionPath)) === path.resolve(targetPath);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * On Windows, apostrophes in the project path break Next.js/webpack module resolution.
+ * Use a drive junction (e.g. E:\pdf-ai -> E:\pdf'ai) instead of SUBST.
+ */
 export function ensureSubst() {
   const normalized = path.resolve(REAL_ROOT);
 
@@ -29,18 +39,22 @@ export function ensureSubst() {
     return normalized;
   }
 
-  const mapped = getSubstTarget(DRIVE);
+  const junction = junctionPathFor(normalized);
 
-  if (mapped && path.resolve(mapped) === normalized) {
-    return `${DRIVE}\\`;
+  if (existsSync(junction)) {
+    if (junctionPointsTo(junction, normalized)) {
+      return junction;
+    }
+
+    if (isJunction(junction)) {
+      execSync(`cmd /c rmdir "${junction}"`, { stdio: "ignore" });
+    } else {
+      throw new Error(
+        `Cannot create dev junction: "${junction}" exists and is not a link to this project.`,
+      );
+    }
   }
 
-  try {
-    execSync(`subst ${DRIVE} /D`, { stdio: "ignore" });
-  } catch {
-    /* ignore */
-  }
-
-  execSync(`subst ${DRIVE} "${normalized}"`);
-  return `${DRIVE}\\`;
+  execSync(`cmd /c mklink /J "${junction}" "${normalized}"`, { stdio: "inherit" });
+  return junction;
 }

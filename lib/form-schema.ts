@@ -30,6 +30,19 @@ export const TOOLS_USED = [
   "Custom CRM",
   "Kita",
 ] as const;
+export const COMPANY_AI_LICENSE = [
+  "Taip — įmonė turi oficialią DI licenciją darbuotojams",
+  "Ne — naudojame nemokamus ar asmeninius įrankius",
+  "Nežinau",
+] as const;
+export const COMPANY_AI_LICENSE_YES = COMPANY_AI_LICENSE[0];
+export const COMPANY_AI_LICENSE_TOOLS = [
+  "Microsoft 365 Copilot",
+  "ChatGPT Team / Enterprise",
+  "Google Gemini (Workspace)",
+  "GitHub Copilot",
+  "Kita",
+] as const;
 export const AI_TOOLS = [
   "ChatGPT",
   "Copilot",
@@ -91,6 +104,11 @@ export const stepSchemas = {
   tools: z.object({
     tools_used: z.array(z.enum(TOOLS_USED)).min(1, "Pasirinkite bent vieną programą"),
     tools_other: z.string().optional(),
+    company_ai_license: z.enum(COMPANY_AI_LICENSE, {
+      required_error: "Pasirinkite, ar įmonė turi DI licenciją",
+    }),
+    company_ai_license_tools: z.array(z.enum(COMPANY_AI_LICENSE_TOOLS)).optional(),
+    company_ai_license_details: z.string().optional(),
     ai_tools_tried: z.array(z.enum(AI_TOOLS)).min(1, "Pasirinkite bent vieną variantą"),
     ai_experience: z.enum(AI_EXPERIENCE, { required_error: "Pasirinkite patirties lygį" }),
     ai_fears: z.array(z.enum(AI_FEARS)).min(1, "Pasirinkite bent vieną variantą"),

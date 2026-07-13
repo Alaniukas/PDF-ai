@@ -6,6 +6,11 @@ import Link from "next/link";
 import { FormWizard } from "@/components/form/FormWizard";
 import { SiteLogo } from "@/components/landing/SiteLogo";
 import { trackLead } from "@/lib/analytics/track";
+import {
+  createMetaEventId,
+  getMetaBrowserIds,
+  sendServerMetaEvent,
+} from "@/lib/analytics/meta-client";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
 import { PACKAGE_LIST, PackageId, getPackage } from "@/lib/packages";
 
@@ -28,9 +33,20 @@ function AnketaContent() {
   }, [packageParam]);
 
   useEffect(() => {
-    if (hasAnalyticsConsent()) {
-      trackLead(`anketa_${selectedPackage}`);
-    }
+    if (!hasAnalyticsConsent()) return;
+
+    const source = `anketa_${selectedPackage}`;
+    const eventId = createMetaEventId("lead");
+    const browserIds = getMetaBrowserIds();
+
+    trackLead(source, eventId);
+    void sendServerMetaEvent({
+      event_name: "Lead",
+      event_id: eventId,
+      event_source_url: window.location.href,
+      content_name: source,
+      ...browserIds,
+    });
   }, [selectedPackage]);
 
   const selectPackage = useCallback(
@@ -42,9 +58,9 @@ function AnketaContent() {
   );
 
   return (
-    <div className="min-h-screen px-6 py-12">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-8 text-center">
+    <div className="min-h-screen overflow-x-clip px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto min-w-0 max-w-2xl">
+        <div className="mb-6 text-center sm:mb-8">
           <div className="mb-6 flex justify-center">
             <SiteLogo />
           </div>
@@ -54,8 +70,8 @@ function AnketaContent() {
           <p className="mt-4 text-sm font-medium uppercase tracking-widest text-sage">
             1 žingsnis — Anketa
           </p>
-          <h1 className="mt-2 font-serif text-3xl text-ink">Papasakokite apie savo darbą</h1>
-          <p className="mt-3 text-ink-muted">
+          <h1 className="mt-2 font-serif text-2xl text-ink sm:text-3xl">Papasakokite apie savo darbą</h1>
+          <p className="mt-3 text-sm leading-relaxed text-ink-muted sm:text-base">
             Užpildykite anketą, tada apmokėsite pasirinktą paketą. PDF atsiųsime Jūsų el. paštu per{" "}
             <strong className="text-ink">24 val.</strong> — su žingsniais, programų naudojimu ir ekrano paaiškinimais.
           </p>
@@ -66,7 +82,7 @@ function AnketaContent() {
           )}
         </div>
 
-        <div className="mb-8 rounded-2xl border border-cream-dark bg-white p-5">
+        <div className="mb-6 rounded-2xl border border-cream-dark bg-white p-4 sm:mb-8 sm:p-5">
           <p className="text-sm font-medium text-ink">Pasirinkite paketą</p>
           <p className="mt-1 text-xs text-ink-muted">
             Kaina ir klausimų skaičius priklauso nuo pasirinkto paketo
@@ -101,7 +117,7 @@ function AnketaContent() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-cream-dark bg-white p-6 md:p-10">
+        <div className="rounded-2xl border border-cream-dark bg-white p-4 sm:p-6 md:p-10">
           <FormWizard
             key={selectedPackage}
             packageId={selectedPackage}

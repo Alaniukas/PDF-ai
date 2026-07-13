@@ -14,7 +14,7 @@ export function PdfPreviewSection() {
   return (
     <section id="pavyzdys" className="section-space scroll-mt-20 border-y border-cream-dark bg-white">
       <div className="layout-shell">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-1.5 text-xs font-medium uppercase tracking-wider text-amber-900">
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-amber-900 sm:px-4 sm:text-xs">
           ⚠ Tik pavyzdys — Jūsų gidas bus individualus
         </div>
         <p className="section-number mb-3 text-sm font-medium uppercase tracking-widest text-sage">

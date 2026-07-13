@@ -11,7 +11,7 @@ export type PhotoItem = {
 
 export function ScreenshotGuide() {
   return (
-    <div className="rounded-xl border border-sage/25 bg-sage-light/25 p-4 text-sm">
+    <div className="rounded-xl border border-sage/25 bg-sage-light/25 p-3 text-sm sm:p-4">
       <p className="font-medium text-sage-dark">Kaip padaryti ir įkelti ekrano nuotrauką?</p>
       <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-ink-muted">
         <li>
@@ -109,7 +109,7 @@ export function PhotoUpload({
 
       {photos.length < maxFiles && (
         <div
-          className={`rounded-xl border-2 border-dashed px-6 py-8 transition-colors ${
+          className={`rounded-xl border-2 border-dashed px-3 py-5 transition-colors sm:px-6 sm:py-8 ${
             dragOver ? "border-sage bg-sage-light/30" : "border-cream-dark"
           }`}
           onDragOver={(e) => {
@@ -144,7 +144,7 @@ export function PhotoUpload({
             onFocus={() => setPasteFocused(true)}
             onBlur={() => setPasteFocused(false)}
             onClick={() => pasteZoneRef.current?.focus()}
-            className={`cursor-text rounded-xl border-2 px-6 py-8 text-center transition-colors outline-none ${
+            className={`cursor-text rounded-xl border-2 px-4 py-6 text-center transition-colors outline-none sm:px-6 sm:py-8 ${
               pasteFocused
                 ? "border-sage bg-sage-light/40 ring-2 ring-sage/30"
                 : "border-sage/40 bg-sage-light/20 hover:border-sage hover:bg-sage-light/30"
@@ -174,23 +174,26 @@ export function PhotoUpload({
       )}
 
       {photos.map((photo, i) => (
-        <div key={photo.preview} className="rounded-xl border border-cream-dark bg-white p-4">
-          <div className="flex flex-col gap-4 sm:flex-row">
+        <div key={photo.preview} className="rounded-xl border border-cream-dark bg-white p-3 sm:p-4">
+          <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photo.preview}
               alt={`Nuotrauka ${i + 1}`}
-              className="h-40 w-full rounded-lg border border-cream-dark object-contain bg-cream sm:h-36 sm:w-48"
+              className="h-36 w-full rounded-lg border border-cream-dark bg-cream object-contain sm:h-36 sm:w-48"
             />
-            <div className="flex-1">
-              <div className="flex items-start justify-between">
-                <p className="text-sm font-medium text-ink">
-                  Nuotrauka {i + 1}: {photo.file.name}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-sm font-medium text-ink">
+                  <span className="block">Nuotrauka {i + 1}</span>
+                  <span className="mt-0.5 block truncate text-xs font-normal text-ink-muted">
+                    {photo.file.name}
+                  </span>
                 </p>
                 <button
                   type="button"
                   onClick={() => removePhoto(i)}
-                  className="text-sm text-ink-light hover:text-ink cursor-pointer"
+                  className="shrink-0 text-sm text-ink-light hover:text-ink cursor-pointer"
                 >
                   Pašalinti
                 </button>
@@ -200,7 +203,7 @@ export function PhotoUpload({
                 onChange={(e) => updateComment(i, e.target.value)}
                 placeholder="Ką rodo ši nuotrauka? Kur spustelėti? Kas neveikia? Ką norėtumėte, kad veiktų kitaip?"
                 rows={4}
-                className="mt-2 w-full rounded-lg border border-cream-dark bg-cream px-3 py-2 text-sm text-ink placeholder:text-ink-light focus:border-sage focus:outline-none"
+                className="form-field mt-2 text-sm"
               />
             </div>
           </div>

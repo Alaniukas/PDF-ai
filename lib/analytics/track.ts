@@ -30,14 +30,25 @@ export function loadMetaPixel() {
   } as FbqStub;
   fbq.queue = [];
   window.fbq = fbq;
-  window.fbq("init", PIXEL_ID);
+  window.fbq("init", PIXEL_ID, {
+    autoConfig: true,
+    xfbml: false,
+  });
   window.fbq("track", "PageView");
 
   pixelLoaded = true;
 }
 
-export function trackMeta(event: string, params?: Record<string, unknown>) {
+export function trackMeta(
+  event: string,
+  params?: Record<string, unknown>,
+  eventId?: string
+) {
   if (typeof window === "undefined" || !window.fbq) return;
+  if (eventId) {
+    window.fbq("track", event, params || {}, { eventID: eventId });
+    return;
+  }
   if (params) {
     window.fbq("track", event, params);
   } else {
@@ -45,8 +56,16 @@ export function trackMeta(event: string, params?: Record<string, unknown>) {
   }
 }
 
-export function trackMetaCustom(name: string, params?: Record<string, unknown>) {
+export function trackMetaCustom(
+  name: string,
+  params?: Record<string, unknown>,
+  eventId?: string
+) {
   if (typeof window === "undefined" || !window.fbq) return;
+  if (eventId) {
+    window.fbq("trackCustom", name, params || {}, { eventID: eventId });
+    return;
+  }
   if (params) {
     window.fbq("trackCustom", name, params);
   } else {
@@ -71,22 +90,40 @@ export function trackTimeOnPage(seconds: number, path: string) {
   trackMetaCustom("TimeOnPage", { seconds, path });
 }
 
-export function trackLead(source: string) {
-  trackMeta("Lead", { content_name: source });
+export function trackLead(source: string, eventId?: string) {
+  trackMeta(
+    "Lead",
+    {
+      content_name: source,
+    },
+    eventId
+  );
 }
 
-export function trackInitiateCheckout(value: number, packageId: string) {
-  trackMeta("InitiateCheckout", {
-    value,
-    currency: "EUR",
-    content_name: packageId,
-  });
+export function trackInitiateCheckout(value: number, packageId: string, eventId?: string) {
+  trackMeta(
+    "InitiateCheckout",
+    {
+      value,
+      currency: "EUR",
+      content_name: packageId,
+      content_ids: [packageId],
+      num_items: 1,
+    },
+    eventId
+  );
 }
 
-export function trackPurchase(value: number, packageId?: string) {
-  trackMeta("Purchase", {
-    value,
-    currency: "EUR",
-    content_name: packageId ?? "order",
-  });
+export function trackPurchase(value: number, packageId?: string, eventId?: string) {
+  trackMeta(
+    "Purchase",
+    {
+      value,
+      currency: "EUR",
+      content_name: packageId ?? "order",
+      content_ids: packageId ? [packageId] : undefined,
+      num_items: 1,
+    },
+    eventId
+  );
 }

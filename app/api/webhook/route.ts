@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { notifyAdminPaidOrder } from "@/lib/notify-admin";
+import { getAppUrl } from "@/lib/app-url";
+import { purchaseEventId, sendMetaCapiEvent } from "@/lib/meta-capi";
 import { createServiceClient } from "@/lib/supabase";
 
 export async function POST(request: NextRequest) {
@@ -79,6 +81,26 @@ export async function POST(request: NextRequest) {
           console.error("Admin email failed (order still paid):", emailErr);
         }
       }
+
+      const purchaseEmail =
+        session.customer_details?.email || session.customer_email || undefined;
+      await sendMetaCapiEvent({
+        eventName: "Purchase",
+        eventId: purchaseEventId(session.id),
+        eventSourceUrl: `${getAppUrl()}/aciu?session_id=${session.id}`,
+        userData: {
+          email: purchaseEmail,
+          externalId: notifyOrderId || orderIdFromMeta || session.id,
+        },
+        customData: {
+          value: (session.amount_total || 0) / 100,
+          currency: (session.currency || "eur").toUpperCase(),
+          content_name: session.metadata?.package_id || "order",
+          content_ids: session.metadata?.package_id
+            ? [session.metadata.package_id]
+            : undefined,
+        },
+      });
     } catch (err) {
       console.error("Webhook processing error:", err);
       return NextResponse.json({ error: "Processing error" }, { status: 500 });

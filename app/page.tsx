@@ -14,7 +14,7 @@ import { FinalCTA } from "@/components/landing/FinalCTA";
 
 export default function HomePage() {
   return (
-    <main>
+    <main className="overflow-x-clip">
       <SiteHeader />
       <ScrollHint />
       <Hero />

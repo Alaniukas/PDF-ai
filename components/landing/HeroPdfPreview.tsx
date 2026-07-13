@@ -34,7 +34,7 @@ function PdfFanStack({ tall = false }: { tall?: boolean }) {
     >
       <div
         className={`relative overflow-hidden rounded-2xl bg-sage-light/35 ${
-          tall ? "h-[440px] sm:h-[480px]" : "h-[400px] sm:h-[440px]"
+          tall ? "h-[300px] sm:h-[440px] md:h-[480px]" : "h-[280px] sm:h-[400px] md:h-[440px]"
         }`}
       >
         {PDF_PREVIEW_PAGES.map((page, i) => (
@@ -111,7 +111,7 @@ export function PdfSamplePreviewCard({
 
 export function HeroPdfPreview() {
   return (
-    <div className="mx-auto w-full max-w-xl lg:max-w-none">
+    <div className="mx-auto w-full min-w-0 max-w-xl lg:max-w-none">
       <div className="relative">
         <div className="absolute -inset-6 rounded-3xl bg-sage-light/25 blur-2xl" />
         <div className="relative">

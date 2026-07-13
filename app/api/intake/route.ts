@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { createServiceClient, getSupabaseProjectRef } from "@/lib/supabase";
 import { fullFormSchema } from "@/lib/form-schema";
 import { detectImageMime, imageContentType, mimeToExt } from "@/lib/image-upload";
+import { sendMetaCapiEvent, splitName } from "@/lib/meta-capi";
 import { PACKAGES, PackageId } from "@/lib/packages";
 
 function supabaseConfigError(): string | null {
@@ -29,6 +30,20 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const answersRaw = formData.get("answers") as string;
     const packageId = formData.get("package_id") as PackageId;
+    const metaTrackingRaw = formData.get("meta_tracking") as string | null;
+    let metaTracking: {
+      initiate_checkout_event_id?: string;
+      fbp?: string;
+      fbc?: string;
+    } = {};
+
+    if (metaTrackingRaw) {
+      try {
+        metaTracking = JSON.parse(metaTrackingRaw);
+      } catch {
+        console.warn("Invalid meta_tracking JSON");
+      }
+    }
 
     if (!answersRaw || !packageId) {
       return NextResponse.json({ error: "Trūksta duomenų" }, { status: 400 });
@@ -153,6 +168,37 @@ export async function POST(request: NextRequest) {
       console.error("Photo manifest present but no files received in FormData", {
         orderId: order.id,
         manifest,
+      });
+    }
+
+    if (metaTracking.initiate_checkout_event_id) {
+      const { firstName, lastName } = splitName(validation.data.name);
+      const clientIp =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        undefined;
+
+      await sendMetaCapiEvent({
+        eventName: "InitiateCheckout",
+        eventId: metaTracking.initiate_checkout_event_id,
+        eventSourceUrl: `${getAppUrl()}/anketa?package=${packageId}`,
+        userData: {
+          email: validation.data.email,
+          firstName,
+          lastName,
+          city: validation.data.city,
+          externalId: order.id,
+          fbp: metaTracking.fbp,
+          fbc: metaTracking.fbc,
+          clientIp,
+          userAgent: request.headers.get("user-agent") || undefined,
+        },
+        customData: {
+          value: pkg.priceEur,
+          currency: "EUR",
+          content_name: packageId,
+          content_ids: [packageId],
+        },
       });
     }
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { notifyAdminPaidOrder } from "@/lib/notify-admin";
+import { getAppUrl } from "@/lib/app-url";
+import { purchaseEventId, sendMetaCapiEvent } from "@/lib/meta-capi";
 import { createServiceClient } from "@/lib/supabase";
 import { orderFieldsFromSession } from "@/lib/order-utils";
 import { getPackage } from "@/lib/packages";
@@ -105,6 +107,33 @@ export async function GET(request: NextRequest) {
       } catch (emailErr) {
         console.error("Admin email failed (order still paid):", emailErr);
       }
+
+      const fbp = request.cookies.get("_fbp")?.value;
+      const fbc = request.cookies.get("_fbc")?.value;
+      const clientIp =
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        request.headers.get("x-real-ip") ||
+        undefined;
+
+      await sendMetaCapiEvent({
+        eventName: "Purchase",
+        eventId: purchaseEventId(sessionId),
+        eventSourceUrl: `${getAppUrl()}/aciu?session_id=${sessionId}`,
+        userData: {
+          email: order.email,
+          externalId: order.id,
+          fbp,
+          fbc,
+          clientIp,
+          userAgent: request.headers.get("user-agent") || undefined,
+        },
+        customData: {
+          value: (fields.amount_cents || 0) / 100,
+          currency: "EUR",
+          content_name: order.package_id,
+          content_ids: [order.package_id],
+        },
+      });
     }
 
     const pkg = getPackage(order.package_id);

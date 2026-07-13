@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
+import { purchaseEventId } from "@/lib/analytics/meta-client";
 import { loadMetaPixel, trackPurchase } from "@/lib/analytics/track";
 import { COMPANY } from "@/lib/company";
 
@@ -27,8 +28,9 @@ function PurchaseTrackerInner() {
 
         if (!analyticsFired.current && hasAnalyticsConsent()) {
           analyticsFired.current = true;
+          const eventId = purchaseEventId(sessionId);
           loadMetaPixel();
-          trackPurchase(data.amountEur || 0, data.packageId);
+          trackPurchase(data.amountEur || 0, data.packageId, eventId);
         }
       })
       .catch(() => setConfirmError("Nepavyko patvirtinti mokėjimo"));

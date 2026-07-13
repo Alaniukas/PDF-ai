@@ -3,7 +3,7 @@ import { PurchaseTracker } from "@/components/analytics/PurchaseTracker";
 
 export default function AciuPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center overflow-x-clip px-4 py-8 text-center sm:px-6">
       <PurchaseTracker />
       <div className="max-w-md animate-fade-in">
         <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-sage-light text-2xl text-sage">

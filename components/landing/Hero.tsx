@@ -9,10 +9,10 @@ export function Hero() {
           <p className="mb-3 text-sm font-medium uppercase tracking-widest text-sage">
             Asmeninis DI darbo gidas
           </p>
-          <h1 className="font-serif text-4xl leading-tight text-ink md:text-5xl lg:text-[3.25rem]">
+          <h1 className="font-serif text-[1.65rem] leading-tight text-ink min-[400px]:text-3xl sm:text-4xl md:text-5xl lg:text-[3.25rem]">
             Vadovas spaudžia naudoti dirbtinį intelektą — o Jūs nežinote, nuo ko pradėti?
           </h1>
-          <p className="mt-5 text-lg leading-relaxed text-ink-muted">
+          <p className="mt-5 text-base leading-relaxed text-ink-muted sm:text-lg">
             Visi aplinkui sako DI, AI, ChatGPT… o Jūs tiesiog norite normaliai atlikti savo darbą.
             Užpildykite trumpą anketą — ir per{" "}
             <strong className="font-medium text-ink">24 val.</strong> gausite asmeninį PDF gidą:
@@ -22,13 +22,13 @@ export function Hero() {
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <Link
               href="/anketa?package=popular"
-              className="inline-flex items-center justify-center rounded-full bg-sage px-8 py-3.5 text-base font-medium text-white shadow-sm transition-colors hover:bg-sage-dark"
+              className="inline-flex w-full items-center justify-center rounded-full bg-sage px-6 py-3.5 text-base font-medium text-white shadow-sm transition-colors hover:bg-sage-dark sm:w-auto sm:px-8"
             >
               Skaitmenizuoti darbą
             </Link>
             <a
               href="#pavyzdys"
-              className="inline-flex items-center justify-center rounded-full border border-sage/40 bg-sage-light/40 px-8 py-3.5 text-base font-medium text-sage-dark transition-colors hover:bg-sage-light"
+              className="inline-flex w-full items-center justify-center rounded-full border border-sage/40 bg-sage-light/40 px-6 py-3.5 text-base font-medium text-sage-dark transition-colors hover:bg-sage-light sm:w-auto sm:px-8"
             >
               Peržiūrėti PDF pavyzdį
             </a>
