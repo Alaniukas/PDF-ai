@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type PhotoItem = {
   file: File;
@@ -11,21 +11,31 @@ export type PhotoItem = {
 export function ScreenshotGuide() {
   return (
     <div className="rounded-xl border border-sage/25 bg-sage-light/25 p-4 text-sm">
-      <p className="font-medium text-sage-dark">Kaip padaryti ekrano nuotrauką?</p>
-      <ul className="mt-2 space-y-1.5 text-ink-muted">
+      <p className="font-medium text-sage-dark">Kaip padaryti ir įkelti ekrano nuotrauką?</p>
+      <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-ink-muted">
         <li>
           <strong className="text-ink">Windows:</strong> paspauskite{" "}
           <code className="rounded bg-white px-1.5 py-0.5 text-xs">Win + Shift + S</code> — pažymėkite
-          visą langą ar problematišką vietą
+          langą ar problematišką vietą
         </li>
         <li>
           <strong className="text-ink">Mac:</strong> paspauskite{" "}
           <code className="rounded bg-white px-1.5 py-0.5 text-xs">Cmd + Shift + 4</code>
         </li>
-        <li>Įkelkite nuotrauką ir po ja parašykite komentarą — kas matoma, kas neveikia, ką norite pakeisti</li>
-        <li>Geriausia: 1 nuotrauka = 1 žingsnis arba 1 problema (pvz. Excel lentelė, el. laiško langas)</li>
-        <li>Nebūtina slėpti duomenų — galite užmaskuoti vardus ranka, bet palikite struktūrą matomą</li>
-      </ul>
+        <li>
+          Nuotrauka išsaugoma į <strong className="text-ink">iškarpinę</strong> (clipboard). Tada spustelėkite
+          žemiau esantį lauką ir paspauskite{" "}
+          <code className="rounded bg-white px-1.5 py-0.5 text-xs">Ctrl + V</code>{" "}
+          (<code className="rounded bg-white px-1.5 py-0.5 text-xs">Cmd + V</code> Mac)
+        </li>
+        <li>
+          Arba vilkite failą į lauką, arba spustelėkite ir pasirinkite iš kompiuterio (pvz. iš
+          Atsisiuntimų, jei išsaugojote)
+        </li>
+      </ol>
+      <p className="mt-3 text-ink-muted">
+        Po įkėlimo parašykite komentarą — kas matoma, kas neveikia. Geriausia: 1 nuotrauka = 1 žingsnis.
+      </p>
     </div>
   );
 }
@@ -42,10 +52,14 @@ export function PhotoUpload({
   const [dragOver, setDragOver] = useState(false);
 
   const addFiles = useCallback(
-    (files: FileList | null) => {
-      if (!files) return;
+    (files: FileList | File[] | null) => {
+      if (!files || files.length === 0) return;
       const remaining = maxFiles - photos.length;
-      const toAdd = Array.from(files).slice(0, remaining);
+      const toAdd = Array.from(files)
+        .filter((f) => f.type.startsWith("image/"))
+        .slice(0, remaining);
+
+      if (toAdd.length === 0) return;
 
       const newPhotos: PhotoItem[] = toAdd.map((file) => ({
         file,
@@ -57,6 +71,29 @@ export function PhotoUpload({
     },
     [photos, onChange, maxFiles]
   );
+
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      const imageFiles: File[] = [];
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        addFiles(imageFiles);
+      }
+    }
+
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [addFiles]);
 
   function removePhoto(index: number) {
     URL.revokeObjectURL(photos[index].preview);
@@ -73,7 +110,7 @@ export function PhotoUpload({
 
       {photos.length < maxFiles && (
         <label
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition-colors ${
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 transition-colors outline-none focus-within:border-sage focus-within:ring-2 focus-within:ring-sage/30 ${
             dragOver ? "border-sage bg-sage-light/30" : "border-cream-dark hover:border-sage"
           }`}
           onDragOver={(e) => {
@@ -95,8 +132,12 @@ export function PhotoUpload({
             onChange={(e) => addFiles(e.target.files)}
           />
           <p className="font-medium text-ink">Įkelkite ekrano nuotraukas</p>
-          <p className="mt-1 text-sm text-ink-muted">
-            JPG, PNG, WEBP — iki {maxFiles} failų (rekomenduojama, bet nebūtina)
+          <p className="mt-1 text-center text-sm text-ink-muted">
+            Spustelėkite čia ir paspauskite{" "}
+            <strong className="text-ink">Ctrl + V</strong>, jei nuotrauka jau iškarpinėje
+          </p>
+          <p className="mt-1 text-xs text-ink-light">
+            Arba vilkite failus · JPG, PNG, WEBP — iki {maxFiles} failų
           </p>
         </label>
       )}

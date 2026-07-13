@@ -7,6 +7,10 @@ export const metadata: Metadata = {
   title: "DI darbo gidas | Asmeninis PDF Jūsų darbui",
   description:
     "Vadovas spaudžia naudoti DI, o Jūs nežinote, nuo ko pradėti? Gaukite asmeninį PDF gidą su žingsniais, programų naudojimu ir ekrano paaiškinimais — be techninio žargono.",
+  icons: {
+    icon: "/images/logo-lafela.png",
+    apple: "/images/logo-lafela.png",
+  },
 };
 
 export default function RootLayout({

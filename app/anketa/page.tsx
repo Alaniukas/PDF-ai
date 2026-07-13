@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FormWizard } from "@/components/form/FormWizard";
+import { SiteLogo } from "@/components/landing/SiteLogo";
 import { trackLead } from "@/lib/analytics/track";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
 import { PACKAGE_LIST, PackageId, getPackage } from "@/lib/packages";
@@ -44,6 +45,9 @@ function AnketaContent() {
     <div className="min-h-screen px-6 py-12">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 text-center">
+          <div className="mb-6 flex justify-center">
+            <SiteLogo />
+          </div>
           <Link href="/" className="text-sm text-sage hover:underline">
             ← Grįžti
           </Link>

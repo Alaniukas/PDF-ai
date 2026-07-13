@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AGE_RANGES,
   AI_EXPERIENCE,
@@ -201,6 +201,10 @@ export function FormWizard({ packageId, packageInfo }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const currentStepId = FORM_STEPS[step].id as StepId;
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
 
   function updateField(key: keyof typeof emptyForm, value: string | boolean | string[]) {
     setForm((prev) => ({ ...prev, [key]: value }));

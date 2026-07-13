@@ -1,13 +1,20 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
+export function normalizeSupabaseUrl(raw: string): string {
+  return raw.trim().replace(/\/rest\/v1\/?$/i, "").replace(/\/+$/, "");
+}
+
 function getSupabaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!url) throw new Error("NEXT_PUBLIC_SUPABASE_URL is not set");
-  return url;
+  return normalizeSupabaseUrl(url);
 }
 
 export function getSupabaseProjectRef(value: string): string | null {
-  const urlMatch = value.match(/https:\/\/([^.]+)\.supabase\.co/);
+  const normalized = value.includes("supabase.co")
+    ? normalizeSupabaseUrl(value)
+    : value;
+  const urlMatch = normalized.match(/https:\/\/([^.]+)\.supabase\.co/);
   if (urlMatch) return urlMatch[1];
 
   try {

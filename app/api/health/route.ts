@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { getSupabaseProjectRef } from "@/lib/supabase";
+import { getSupabaseProjectRef, normalizeSupabaseUrl } from "@/lib/supabase";
 
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const urlRaw = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const url = urlRaw ? normalizeSupabaseUrl(urlRaw) : "";
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   const stripeKey = process.env.STRIPE_SECRET_KEY || "";
@@ -18,6 +19,12 @@ export async function GET() {
   if (!anonKey) issues.push("Trūksta NEXT_PUBLIC_SUPABASE_ANON_KEY");
   if (!serviceKey) issues.push("Trūksta SUPABASE_SERVICE_ROLE_KEY");
   if (!stripeKey) issues.push("Trūksta STRIPE_SECRET_KEY");
+
+  if (urlRaw && /\/rest\/v1\/?$/i.test(urlRaw.trim())) {
+    issues.push(
+      "NEXT_PUBLIC_SUPABASE_URL turi būti be /rest/v1/ — naudokite tik https://jqvlfatzquclkfrclxuh.supabase.co"
+    );
+  }
 
   if (url && !urlRef) {
     issues.push(
