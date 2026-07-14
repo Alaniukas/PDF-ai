@@ -19,7 +19,7 @@ export function SiteHeader() {
       <header className="sticky top-0 z-40 border-b border-cream-dark bg-cream/95 py-2.5 backdrop-blur-sm sm:py-3">
         <div className="layout-shell flex min-w-0 items-center justify-between gap-3">
           <SiteLogo className="min-w-0 shrink" />
-          <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-2.5 gap-y-2 text-[11px] sm:gap-x-4 sm:text-sm">
+          <nav className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1.5 text-xs sm:gap-x-4 sm:gap-y-2 sm:text-sm">
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
@@ -38,7 +38,7 @@ export function SiteHeader() {
             </button>
             <Link
               href="/anketa?package=popular"
-              className="whitespace-nowrap rounded-full bg-sage px-3.5 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-sage-dark sm:px-5 sm:text-sm"
+              className="whitespace-nowrap rounded-full bg-sage px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sage-dark sm:px-5 sm:py-2 sm:text-sm"
             >
               Skaitmenizuoti
             </Link>

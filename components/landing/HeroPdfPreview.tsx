@@ -25,7 +25,7 @@ export const PDF_PREVIEW_PAGES = [
   },
 ] as const;
 
-function PdfFanStack({ tall = false }: { tall?: boolean }) {
+function PdfFanStack({ tall = false, compact = false }: { tall?: boolean; compact?: boolean }) {
   return (
     <div
       className={`relative mx-auto w-full ${
@@ -34,7 +34,11 @@ function PdfFanStack({ tall = false }: { tall?: boolean }) {
     >
       <div
         className={`relative overflow-hidden rounded-2xl bg-sage-light/35 ${
-          tall ? "h-[300px] sm:h-[440px] md:h-[480px]" : "h-[280px] sm:h-[400px] md:h-[440px]"
+          compact
+            ? "h-[220px] sm:h-[280px]"
+            : tall
+              ? "h-[300px] sm:h-[440px] md:h-[480px]"
+              : "h-[280px] sm:h-[400px] md:h-[440px]"
         }`}
       >
         {PDF_PREVIEW_PAGES.map((page, i) => (
@@ -109,18 +113,31 @@ export function PdfSamplePreviewCard({
   );
 }
 
-export function HeroPdfPreview() {
+export function HeroPdfPreview({ compactOnMobile = false }: { compactOnMobile?: boolean }) {
   return (
     <div className="mx-auto w-full min-w-0 max-w-xl lg:max-w-none">
       <div className="relative">
-        <div className="absolute -inset-6 rounded-3xl bg-sage-light/25 blur-2xl" />
+        <div className="absolute -inset-4 rounded-3xl bg-sage-light/30 blur-2xl sm:-inset-6 sm:bg-sage-light/25" />
         <div className="relative">
-          <PdfSamplePreviewCard tall />
+          {compactOnMobile ? (
+            <>
+              <div className="lg:hidden">
+                <div className="rounded-2xl border border-cream-dark bg-white p-2 shadow-lg">
+                  <PdfFanStack compact />
+                </div>
+              </div>
+              <div className="hidden lg:block">
+                <PdfSamplePreviewCard tall />
+              </div>
+            </>
+          ) : (
+            <PdfSamplePreviewCard tall />
+          )}
           <a
             href={SAMPLE_PDF_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 flex items-center justify-center gap-2 text-xs text-ink-light hover:text-sage"
+            className="mt-3 flex items-center justify-center gap-2 text-xs text-ink-light hover:text-sage sm:mt-4"
           >
             <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-sage-light text-[10px] text-sage">
               PDF
