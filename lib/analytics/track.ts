@@ -1,42 +1,105 @@
 declare global {
   interface Window {
-    fbq?: {
-      (...args: unknown[]): void;
-      queue?: unknown[];
-    };
+    fbq?: FbqFunction;
+    _fbq?: FbqFunction;
+    clarity?: (...args: unknown[]) => void;
   }
 }
 
-const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+type FbqFunction = ((...args: unknown[]) => void) & {
+  callMethod?: (...args: unknown[]) => void;
+  queue?: unknown[];
+  loaded?: boolean;
+  version?: string;
+  push?: (...args: unknown[]) => void;
+};
+
+const PIXEL_ID = (process.env.NEXT_PUBLIC_META_PIXEL_ID || "").trim();
+const CLARITY_ID = (process.env.NEXT_PUBLIC_CLARITY_ID || "").trim();
 
 let pixelLoaded = false;
+let clarityLoaded = false;
 
 export function isPixelConfigured(): boolean {
   return Boolean(PIXEL_ID);
 }
 
+export function isClarityConfigured(): boolean {
+  return Boolean(CLARITY_ID);
+}
+
+/** Official-style stub so fbevents.js can drain the queue reliably. */
+function ensureFbqStub(): FbqFunction {
+  if (window.fbq) return window.fbq;
+
+  const fbq: FbqFunction = function (...args: unknown[]) {
+    if (fbq.callMethod) {
+      fbq.callMethod(...args);
+    } else {
+      fbq.queue = fbq.queue || [];
+      fbq.queue.push(args);
+    }
+  };
+  fbq.push = fbq;
+  fbq.loaded = true;
+  fbq.version = "2.0";
+  fbq.queue = [];
+  window.fbq = fbq;
+  if (!window._fbq) window._fbq = fbq;
+  return fbq;
+}
+
 export function loadMetaPixel() {
   if (typeof window === "undefined" || !PIXEL_ID || pixelLoaded) return;
 
-  const script = document.createElement("script");
-  script.async = true;
-  script.src = "https://connect.facebook.net/en_US/fbevents.js";
-  document.head.appendChild(script);
+  const fbq = ensureFbqStub();
 
-  type FbqStub = ((...args: unknown[]) => void) & { queue: unknown[] };
+  if (!document.getElementById("meta-pixel-script")) {
+    const script = document.createElement("script");
+    script.id = "meta-pixel-script";
+    script.async = true;
+    script.src = "https://connect.facebook.net/en_US/fbevents.js";
+    const first = document.getElementsByTagName("script")[0];
+    first?.parentNode?.insertBefore(script, first);
+  }
 
-  const fbq = function (...args: unknown[]) {
-    fbq.queue.push(args);
-  } as FbqStub;
-  fbq.queue = [];
-  window.fbq = fbq;
-  window.fbq("init", PIXEL_ID, {
+  fbq("init", PIXEL_ID, {
     autoConfig: true,
     xfbml: false,
   });
-  window.fbq("track", "PageView");
-
+  // PageView is fired by AnalyticsProvider via trackPageView (avoids duplicates)
   pixelLoaded = true;
+}
+
+export function loadClarity() {
+  if (typeof window === "undefined" || !CLARITY_ID || clarityLoaded) return;
+
+  type ClarityStub = ((...args: unknown[]) => void) & { q?: unknown[] };
+  const existing = window.clarity as ClarityStub | undefined;
+  if (!existing) {
+    const stub: ClarityStub = function (...args: unknown[]) {
+      stub.q = stub.q || [];
+      stub.q.push(args);
+    };
+    stub.q = [];
+    window.clarity = stub;
+  }
+
+  if (!document.getElementById("ms-clarity-script")) {
+    const script = document.createElement("script");
+    script.id = "ms-clarity-script";
+    script.async = true;
+    script.src = `https://www.clarity.ms/tag/${CLARITY_ID}`;
+    document.head.appendChild(script);
+  }
+
+  clarityLoaded = true;
+}
+
+/** Load all consent-gated analytics (Pixel + Clarity). */
+export function loadConsentedAnalytics() {
+  loadMetaPixel();
+  loadClarity();
 }
 
 export function trackMeta(
@@ -73,9 +136,24 @@ export function trackMetaCustom(
   }
 }
 
+function clarityEvent(name: string, data?: Record<string, string>) {
+  if (typeof window === "undefined" || !window.clarity) return;
+  try {
+    if (data) {
+      for (const [key, value] of Object.entries(data)) {
+        window.clarity("set", key, value);
+      }
+    }
+    window.clarity("event", name);
+  } catch {
+    // Clarity must not break UX
+  }
+}
+
 export function trackPageView(path: string) {
   trackMeta("PageView");
   trackMetaCustom("PageVisit", { path });
+  clarityEvent("page_view", { path });
 }
 
 export function trackClick(label: string, href?: string) {
@@ -84,6 +162,9 @@ export function trackClick(label: string, href?: string) {
 
 export function trackScrollDepth(percent: number, path: string) {
   trackMetaCustom("ScrollDepth", { percent, path });
+  if (percent === 50 || percent === 100) {
+    clarityEvent(`scroll_${percent}`, { path });
+  }
 }
 
 export function trackTimeOnPage(seconds: number, path: string) {
@@ -98,6 +179,48 @@ export function trackLead(source: string, eventId?: string) {
     },
     eventId
   );
+  clarityEvent("lead", { source });
+}
+
+export function trackFormStart(packageId: string) {
+  trackMetaCustom("FormStart", { content_name: packageId, package_id: packageId });
+  clarityEvent("form_start", { package_id: packageId });
+}
+
+export function trackFormStep(stepId: string, stepIndex: number, packageId: string) {
+  trackMetaCustom("FormStep", {
+    content_name: stepId,
+    step_id: stepId,
+    step_index: stepIndex + 1,
+    package_id: packageId,
+  });
+  clarityEvent("form_step", {
+    step_id: stepId,
+    step: String(stepIndex + 1),
+    package_id: packageId,
+  });
+}
+
+export function trackFormAbandon(stepId: string, stepIndex: number, packageId: string) {
+  trackMetaCustom("FormAbandon", {
+    content_name: stepId,
+    step_id: stepId,
+    step_index: stepIndex + 1,
+    package_id: packageId,
+  });
+  clarityEvent("form_abandon", {
+    step_id: stepId,
+    step: String(stepIndex + 1),
+    package_id: packageId,
+  });
+}
+
+export function trackCheckoutCancelled(packageId: string) {
+  trackMetaCustom("CheckoutCancelled", {
+    content_name: packageId,
+    package_id: packageId,
+  });
+  clarityEvent("checkout_cancelled", { package_id: packageId });
 }
 
 export function trackInitiateCheckout(value: number, packageId: string, eventId?: string) {
@@ -112,6 +235,10 @@ export function trackInitiateCheckout(value: number, packageId: string, eventId?
     },
     eventId
   );
+  clarityEvent("initiate_checkout", {
+    package_id: packageId,
+    value: String(value),
+  });
 }
 
 export function trackPurchase(value: number, packageId?: string, eventId?: string) {
@@ -126,4 +253,8 @@ export function trackPurchase(value: number, packageId?: string, eventId?: strin
     },
     eventId
   );
+  clarityEvent("purchase", {
+    package_id: packageId ?? "order",
+    value: String(value),
+  });
 }

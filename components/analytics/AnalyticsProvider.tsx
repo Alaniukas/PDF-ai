@@ -1,43 +1,67 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
 import {
-  loadMetaPixel,
+  createMetaEventId,
+  getMetaBrowserIds,
+  sendServerMetaEvent,
+} from "@/lib/analytics/meta-client";
+import {
+  loadConsentedAnalytics,
   trackClick,
   trackPageView,
   trackScrollDepth,
   trackTimeOnPage,
 } from "@/lib/analytics/track";
 
+function firePageView(path: string) {
+  trackPageView(path);
+  const eventId = createMetaEventId("pv");
+  const browserIds = getMetaBrowserIds();
+  void sendServerMetaEvent({
+    event_name: "PageView",
+    event_id: eventId,
+    event_source_url: typeof window !== "undefined" ? window.location.href : undefined,
+    content_name: path,
+    ...browserIds,
+  });
+}
+
 function AnalyticsInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const startRef = useRef(Date.now());
   const scrollMarks = useRef(new Set<number>());
+  const [analyticsOn, setAnalyticsOn] = useState(false);
   const path = `${pathname}${searchParams.toString() ? `?${searchParams}` : ""}`;
 
   useEffect(() => {
-    if (hasAnalyticsConsent()) loadMetaPixel();
-
-    const onConsent = () => {
-      if (hasAnalyticsConsent()) loadMetaPixel();
+    const sync = () => {
+      if (!hasAnalyticsConsent()) {
+        setAnalyticsOn(false);
+        return;
+      }
+      loadConsentedAnalytics();
+      setAnalyticsOn(true);
     };
-    window.addEventListener("cookie-consent-change", onConsent);
-    return () => window.removeEventListener("cookie-consent-change", onConsent);
+
+    sync();
+    window.addEventListener("cookie-consent-change", sync);
+    return () => window.removeEventListener("cookie-consent-change", sync);
   }, []);
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
+    if (!analyticsOn) return;
 
     startRef.current = Date.now();
     scrollMarks.current = new Set();
-    trackPageView(path);
-  }, [path]);
+    firePageView(path);
+  }, [path, analyticsOn]);
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
+    if (!analyticsOn) return;
 
     const onScroll = () => {
       const doc = document.documentElement;
@@ -54,10 +78,10 @@ function AnalyticsInner() {
 
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [path]);
+  }, [path, analyticsOn]);
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
+    if (!analyticsOn) return;
 
     const onClick = (e: MouseEvent) => {
       const el = (e.target as HTMLElement).closest("a, button");
@@ -73,10 +97,10 @@ function AnalyticsInner() {
 
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [path]);
+  }, [path, analyticsOn]);
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
+    if (!analyticsOn) return;
 
     const sendTime = () => {
       const seconds = Math.round((Date.now() - startRef.current) / 1000);
@@ -94,7 +118,7 @@ function AnalyticsInner() {
       window.removeEventListener("beforeunload", sendTime);
       sendTime();
     };
-  }, [path]);
+  }, [path, analyticsOn]);
 
   return null;
 }

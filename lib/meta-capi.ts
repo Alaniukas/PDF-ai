@@ -45,8 +45,8 @@ function buildUserData(data: MetaCapiUserData): Record<string, string | string[]
 }
 
 export function isMetaCapiConfigured(): boolean {
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID;
-  return Boolean(pixelId && process.env.META_CAPI_ACCESS_TOKEN);
+  const pixelId = (process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID || "").trim();
+  return Boolean(pixelId && process.env.META_CAPI_ACCESS_TOKEN?.trim());
 }
 
 export async function sendMetaCapiEvent(options: {
@@ -56,8 +56,8 @@ export async function sendMetaCapiEvent(options: {
   userData?: MetaCapiUserData;
   customData?: MetaCapiCustomData;
 }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID;
-  const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
+  const pixelId = (process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID || "").trim();
+  const accessToken = process.env.META_CAPI_ACCESS_TOKEN?.trim();
 
   if (!pixelId || !accessToken) {
     return { ok: false, skipped: true };

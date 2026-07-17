@@ -59,13 +59,18 @@ export async function GET() {
     );
   }
 
-  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID;
+  const pixelId = (process.env.NEXT_PUBLIC_META_PIXEL_ID || process.env.META_PIXEL_ID || "").trim();
   if (!pixelId) {
     warnings.push("Trūksta NEXT_PUBLIC_META_PIXEL_ID — Meta Pixel neveiks");
   } else if (!isMetaCapiConfigured()) {
     warnings.push(
       "Trūksta META_CAPI_ACCESS_TOKEN — veiks tik naršyklės Pixel, be server-side Conversions API"
     );
+  }
+
+  const clarityId = (process.env.NEXT_PUBLIC_CLARITY_ID || "").trim();
+  if (!clarityId) {
+    warnings.push("Trūksta NEXT_PUBLIC_CLARITY_ID — heatmaps / Clarity neveiks");
   }
 
   if (urlRef && anonRef && urlRef !== anonRef) {
@@ -91,6 +96,7 @@ export async function GET() {
       app_url: !appUrlIssue,
       meta_pixel: !!pixelId,
       meta_capi: isMetaCapiConfigured(),
+      clarity: !!clarityId,
     },
     app_url: appUrlIssue ? null : getAppUrl(),
     issues,

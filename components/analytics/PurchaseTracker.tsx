@@ -4,13 +4,28 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { hasAnalyticsConsent } from "@/lib/analytics/consent";
 import { purchaseEventId } from "@/lib/analytics/meta-client";
-import { loadMetaPixel, trackPurchase } from "@/lib/analytics/track";
+import { loadConsentedAnalytics, trackPurchase } from "@/lib/analytics/track";
 import { COMPANY } from "@/lib/company";
+
+type PurchaseInfo = {
+  amountEur: number;
+  packageId?: string;
+  sessionId: string;
+};
 
 function PurchaseTrackerInner() {
   const searchParams = useSearchParams();
   const analyticsFired = useRef(false);
+  const [purchase, setPurchase] = useState<PurchaseInfo | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [analyticsOn, setAnalyticsOn] = useState(false);
+
+  useEffect(() => {
+    const sync = () => setAnalyticsOn(hasAnalyticsConsent());
+    sync();
+    window.addEventListener("cookie-consent-change", sync);
+    return () => window.removeEventListener("cookie-consent-change", sync);
+  }, []);
 
   useEffect(() => {
     const sessionId = searchParams.get("session_id");
@@ -26,15 +41,21 @@ function PurchaseTrackerInner() {
           return;
         }
 
-        if (!analyticsFired.current && hasAnalyticsConsent()) {
-          analyticsFired.current = true;
-          const eventId = purchaseEventId(sessionId);
-          loadMetaPixel();
-          trackPurchase(data.amountEur || 0, data.packageId, eventId);
-        }
+        setPurchase({
+          amountEur: data.amountEur || 0,
+          packageId: data.packageId,
+          sessionId,
+        });
       })
       .catch(() => setConfirmError("Nepavyko patvirtinti mokėjimo"));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!analyticsOn || !purchase || analyticsFired.current) return;
+    analyticsFired.current = true;
+    loadConsentedAnalytics();
+    trackPurchase(purchase.amountEur, purchase.packageId, purchaseEventId(purchase.sessionId));
+  }, [analyticsOn, purchase]);
 
   if (confirmError) {
     return (

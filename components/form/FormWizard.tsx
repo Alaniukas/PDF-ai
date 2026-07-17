@@ -35,7 +35,12 @@ import {
   createMetaEventId,
   getMetaBrowserIds,
 } from "@/lib/analytics/meta-client";
-import { trackInitiateCheckout } from "@/lib/analytics/track";
+import {
+  trackFormAbandon,
+  trackFormStart,
+  trackFormStep,
+  trackInitiateCheckout,
+} from "@/lib/analytics/track";
 import { Package, PackageId } from "@/lib/packages";
 import { GuidedOrFreeField } from "./GuidedOrFreeField";
 import { PhotoItem, PhotoUpload } from "./PhotoUpload";
@@ -213,6 +218,9 @@ export function FormWizard({ packageId, packageInfo }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const stepContentRef = useRef<HTMLDivElement>(null);
+  const formStartedRef = useRef(false);
+  const completedRef = useRef(false);
+  const maxStepReachedRef = useRef(0);
 
   const currentStepId = FORM_STEPS[step].id as StepId;
 
@@ -226,6 +234,43 @@ export function FormWizard({ packageId, packageInfo }: Props) {
       window.scrollTo({ top: Math.max(0, targetY), behavior: "smooth" });
     });
   }, [step]);
+
+  useEffect(() => {
+    if (!hasAnalyticsConsent()) return;
+    if (step > maxStepReachedRef.current) {
+      maxStepReachedRef.current = step;
+    }
+    trackFormStep(FORM_STEPS[step].id, step, packageId);
+  }, [step, packageId]);
+
+  useEffect(() => {
+    const markStart = () => {
+      if (formStartedRef.current || !hasAnalyticsConsent()) return;
+      formStartedRef.current = true;
+      trackFormStart(packageId);
+    };
+
+    const root = stepContentRef.current;
+    root?.addEventListener("focusin", markStart);
+    root?.addEventListener("input", markStart);
+    root?.addEventListener("change", markStart);
+    return () => {
+      root?.removeEventListener("focusin", markStart);
+      root?.removeEventListener("input", markStart);
+      root?.removeEventListener("change", markStart);
+    };
+  }, [packageId, step]);
+
+  useEffect(() => {
+    const onLeave = () => {
+      if (completedRef.current || !formStartedRef.current || !hasAnalyticsConsent()) return;
+      const abandonStep = maxStepReachedRef.current;
+      trackFormAbandon(FORM_STEPS[abandonStep].id, abandonStep, packageId);
+    };
+
+    window.addEventListener("pagehide", onLeave);
+    return () => window.removeEventListener("pagehide", onLeave);
+  }, [packageId]);
 
   function updateField(key: keyof typeof emptyForm, value: string | boolean | string[]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -350,6 +395,7 @@ export function FormWizard({ packageId, packageInfo }: Props) {
 
     const data = await res.json();
     if (res.ok && data.url) {
+      completedRef.current = true;
       if (hasAnalyticsConsent() && checkoutEventId) {
         trackInitiateCheckout(packageInfo.priceEur, packageId, checkoutEventId);
       }

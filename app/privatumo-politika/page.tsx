@@ -158,6 +158,10 @@ export default function PrivatumoPolitikaPage() {
             apmokėjimas) stebėjimui bei Meta reklamų efektyvumui matuoti.
           </li>
           <li>
+            <strong className="text-ink">Microsoft Clarity</strong> — heatmaps, sesijų įrašams ir
+            elgsenos analizei (kur spaudžia lankytojai, kur stringa).
+          </li>
+          <li>
             <strong className="text-ink">Stripe</strong> — mokėjimo metu gali naudoti savo
             slapukus saugiam apmokėjimui.
           </li>

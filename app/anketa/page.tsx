@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { FormWizard } from "@/components/form/FormWizard";
 import { SiteLogo } from "@/components/landing/SiteLogo";
-import { trackLead } from "@/lib/analytics/track";
+import { trackCheckoutCancelled, trackLead } from "@/lib/analytics/track";
 import {
   createMetaEventId,
   getMetaBrowserIds,
@@ -23,6 +23,9 @@ function AnketaContent() {
   const [selectedPackage, setSelectedPackage] = useState<PackageId>(
     packageParam && getPackage(packageParam) ? packageParam : "popular"
   );
+  const [analyticsOn, setAnalyticsOn] = useState(false);
+  const leadKeyRef = useRef<string | null>(null);
+  const cancelTrackedRef = useRef(false);
 
   const packageInfo = getPackage(selectedPackage)!;
 
@@ -33,9 +36,19 @@ function AnketaContent() {
   }, [packageParam]);
 
   useEffect(() => {
-    if (!hasAnalyticsConsent()) return;
+    const sync = () => setAnalyticsOn(hasAnalyticsConsent());
+    sync();
+    window.addEventListener("cookie-consent-change", sync);
+    return () => window.removeEventListener("cookie-consent-change", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!analyticsOn) return;
 
     const source = `anketa_${selectedPackage}`;
+    if (leadKeyRef.current === source) return;
+    leadKeyRef.current = source;
+
     const eventId = createMetaEventId("lead");
     const browserIds = getMetaBrowserIds();
 
@@ -47,7 +60,13 @@ function AnketaContent() {
       content_name: source,
       ...browserIds,
     });
-  }, [selectedPackage]);
+  }, [selectedPackage, analyticsOn]);
+
+  useEffect(() => {
+    if (!analyticsOn || !cancelled || cancelTrackedRef.current) return;
+    cancelTrackedRef.current = true;
+    trackCheckoutCancelled(selectedPackage);
+  }, [analyticsOn, cancelled, selectedPackage]);
 
   const selectPackage = useCallback(
     (id: PackageId) => {

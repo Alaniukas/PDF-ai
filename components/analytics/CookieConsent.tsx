@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { getConsent, setConsent, type CookieConsent } from "@/lib/analytics/consent";
-import { loadMetaPixel } from "@/lib/analytics/track";
+import { getConsent, setConsent, type CookieConsent as ConsentLevel } from "@/lib/analytics/consent";
+import { loadConsentedAnalytics } from "@/lib/analytics/track";
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -11,12 +11,12 @@ export function CookieConsent() {
   useEffect(() => {
     const consent = getConsent();
     setVisible(consent === "pending");
-    if (consent === "all") loadMetaPixel();
+    if (consent === "all") loadConsentedAnalytics();
   }, []);
 
-  const accept = (level: Exclude<CookieConsent, "pending">) => {
+  const accept = (level: Exclude<ConsentLevel, "pending">) => {
     setConsent(level);
-    if (level === "all") loadMetaPixel();
+    if (level === "all") loadConsentedAnalytics();
     setVisible(false);
   };
 
@@ -34,9 +34,9 @@ export function CookieConsent() {
           <p className="font-medium text-ink">Slapukai ir statistika</p>
           <p className="mt-1">
             Naudojame būtinus slapukus svetainės veikimui. Jūsų sutikimu taip pat naudojame
-            analitikos ir Meta (Facebook) Pixel slapukus, kad matytume, kaip lankytojai naudojasi
-            svetaine — kur spustelėja, kiek laiko praleidžia, iš kur atėjo — ir galėtume matuoti
-            Meta reklamų efektyvumą. Daugiau —{" "}
+            analitikos (Microsoft Clarity) ir Meta (Facebook) Pixel slapukus, kad matytume, kaip
+            lankytojai naudojasi svetaine — kur spustelėja, kiek laiko praleidžia, iš kur atėjo —
+            ir galėtume matuoti Meta reklamų efektyvumą. Daugiau —{" "}
             <Link href="/privatumo-politika" className="text-sage underline hover:text-sage-dark">
               privatumo politikoje
             </Link>
